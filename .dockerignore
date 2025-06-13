@@ -1,0 +1,99 @@
+# Rust build artifacts
+/target/
+debug/
+release/
+**/*.rs.bk
+*.orig
+
+# Git files
+.git/
+.gitignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# OS files
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+*~
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Log files
+*.log
+shioaji.log
+
+# Documentation build
+/docs/_build/
+
+# Test coverage
+lcov.info
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Credentials and secrets
+*.key
+*.pem
+*.p12
+api_keys.txt
+secrets.json
+config/prod.toml
+config/local.toml
+config/dev.toml
+
+# Local development
+test_data/
+local_config.toml
+examples/output/
+*.out
+.platform_cache
+
+# Benchmark results
+benches/results/
+criterion/
+
+# Integration test artifacts
+tests/fixtures/generated/
+
+# Development utilities
+scripts/dev/cache/
+scripts/dev/logs/
+
+# Keep only manylinux_x86_64 platform files
+lib/shioaji/macosx_arm/
+
+# Documentation that's not needed in container
+README*.md
+LICENSE-*

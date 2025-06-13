@@ -1,0 +1,147 @@
+# Rust build artifacts
+/target/
+debug/
+release/
+**/*.rs.bk
+*.orig
+
+# Cargo lock for libraries (uncomment if this is an application)
+# Cargo.lock
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# General .so files (but keep shioaji's C extensions)
+*.so
+# Exception: Keep shioaji's required C extensions
+!lib/shioaji/**/*.so
+
+# Python virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# MacOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Linux files
+*~
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Log files
+*.log
+
+# Environment variables
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Documentation build
+/docs/_build/
+
+# Test coverage
+lcov.info
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Editor backups
+*.bak
+*.backup
+
+# OS generated files
+Icon?
+
+# PyCharm
+.idea/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Credentials and secrets (IMPORTANT!)
+*.key
+*.pem
+*.p12
+api_keys.txt
+secrets.json
+config/prod.toml
+
+# Local development configs
+config/local.toml
+config/dev.toml
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Build artifacts from different platforms
+lib/shioaji/*/build/
+lib/shioaji/*/.libs/
+
+# === rshioaji specific ===
+
+# Local test data and configs
+test_data/
+local_config.toml
+
+# Example outputs
+examples/output/
+*.out
+
+# Platform detection cache
+.platform_cache
+
+# Generated documentation
+/book/
+target/doc/
+
+# Benchmark results
+benches/results/
+criterion/
+
+# Integration test artifacts
+tests/fixtures/generated/
+
+# Development utilities
+scripts/dev/cache/
+scripts/dev/logs/
+
+# === Keep these files ===
+# Always keep shioaji Python C extensions
+!lib/shioaji/macosx_arm/**/*.so
+!lib/shioaji/manylinux_x86_64/**/*.so
+# Keep Python module files
+!lib/shioaji/**/*.py
+# Keep documentation
+!README*.md
+!docs/**/*.md
