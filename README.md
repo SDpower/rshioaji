@@ -15,6 +15,7 @@
 - 🚀 **高效能**：基於 Rust 實現，提供優秀的執行效能和記憶體安全
 - 🔗 **相容性**：使用原始 Python C 擴展 (.so 檔案)，確保完整功能相容性
 - 🌐 **多平台支援**：支援 macOS ARM64 和 Linux x86_64 平台
+- 📦 **靜態連結**：支援將 .so 檔案內嵌至執行檔，無運行時依賴
 - 🐳 **容器化**：提供 Docker 支援，便於部署和分發
 - ⚡ **非同步**：基於 tokio 實現非同步操作
 - 🛡️ **型別安全**：完整的 Rust 型別定義，編譯時錯誤檢查
@@ -28,7 +29,7 @@
 
 ### 系統需求
 - Rust 1.75+
-- Python 3.11+
+- Python 3.12+
 - 對應平台的 shioaji C 擴展檔案
 
 ### 開發依賴
@@ -45,9 +46,23 @@ cd rshioaji
 ```
 
 ### 2. 編譯專案
+
+#### 一般編譯（動態連結）
 ```bash
 cargo build --release
 ```
+
+#### 靜態連結編譯（推薦）
+```bash
+cargo build --release --features static-link
+```
+
+**靜態連結優勢**：
+- 🔗 所有 .so 檔案內嵌於執行檔中
+- 📦 單一執行檔，無外部依賴
+- 🚀 更快的啟動時間
+- 🛡️ 提升安全性，減少攻擊面
+- 📋 便於分發和部署
 
 ### 3. 執行範例
 
@@ -63,35 +78,50 @@ cargo run --example basic_usage
 
 ## Docker 部署
 
-### 建置 Docker 映像檔（Linux x86_64）
+### 建置 Docker 映像檔
 
 ```bash
-# 使用建置腳本
-./docker-build.sh
+# Linux x86_64 平台（推薦）
+./docker-build.sh linux
 
-# 或手動建置
-docker build -t rshioaji:latest .
+# macOS ARM64 平台
+./docker-build.sh macos
+
+# 手動建置 Linux x86_64
+docker build -t rshioaji:manylinux-x86_64 -f Dockerfile .
+
+# 手動建置 macOS ARM64
+docker build -t rshioaji:macos-arm64 -f Dockerfile.macos .
 ```
 
 ### 執行容器
 
 ```bash
-# 基本執行
-docker run --rm -it rshioaji:latest
+# Linux x86_64 平台執行
+docker run --rm -it rshioaji:manylinux-x86_64
+
+# macOS ARM64 平台執行（需要 Docker Desktop 實驗功能）
+docker run --rm -it rshioaji:macos-arm64
 
 # 掛載配置目錄
-docker run --rm -it -v $(pwd)/config:/app/config rshioaji:latest
+docker run --rm -it -v $(pwd)/config:/app/config rshioaji:manylinux-x86_64
 
 # 背景執行
-docker run -d --name rshioaji-app rshioaji:latest
+docker run -d --name rshioaji-app rshioaji:manylinux-x86_64
+
+# 檢查執行檔依賴
+docker run --rm rshioaji:manylinux-x86_64 ldd /usr/local/bin/rshioaji
 ```
 
 ### Docker 特點
 
-- 🐧 **Linux 專用**：針對 manylinux_x86_64 平台最佳化
+- 🐧 **多平台支援**：Linux x86_64 和 macOS ARM64 平台
+- 🐍 **Python 3.12**：完整支援 Python 3.12 C 擴展
 - 📦 **多階段建置**：最小化最終映像檔大小
-- 🔧 **環境配置**：自動設定 LD_LIBRARY_PATH 和 PYTHONPATH
-- 🚀 **生產就緒**：基於 Python 3.11 slim 映像檔
+- 🔗 **靜態連結**：.so 檔案內嵌於執行檔中，無運行時依賴
+- 🛡️ **安全強化**：使用非 root 使用者執行
+- ⚡ **快速啟動**：無需載入外部共享程式庫
+- 🚀 **生產就緒**：基於 Debian slim 最小映像檔
 
 ## API 使用
 
@@ -190,14 +220,28 @@ platform.validate_installation(&base_path)?;
 
 ## 環境設定
 
-### macOS ARM64
+### 動態連結版本
+
+#### macOS ARM64
 ```bash
 export DYLD_LIBRARY_PATH=/path/to/lib/shioaji/macosx_arm/backend:/path/to/lib/shioaji/macosx_arm/backend/solace
 ```
 
-### Linux x86_64
+#### Linux x86_64
 ```bash
 export LD_LIBRARY_PATH=/path/to/lib/shioaji/manylinux_x86_64/backend:/path/to/lib/shioaji/manylinux_x86_64/backend/solace
+```
+
+### 靜態連結版本
+
+靜態連結版本無需設定環境變數，可直接執行：
+
+```bash
+# 直接執行，無需額外設定
+./target/release/rshioaji-cli
+
+# 或使用 cargo
+cargo run --release --features static-link
 ```
 
 ## 除錯
@@ -223,10 +267,13 @@ chmod +x lib/shioaji/*/backend/solace/*.so
 A: 請確認對應平台的 .so 檔案存在且有執行權限。
 
 ### Q: Docker 容器無法啟動
-A: 確認使用 Linux x86_64 平台，macOS 檔案已在 .dockerignore 中排除。
+A: 確認使用正確的 Dockerfile（Linux 用 Dockerfile，macOS 用 Dockerfile.macos）。
+
+### Q: Python 3.12 模組載入錯誤
+A: 確認 lib/shioaji 目錄下的 .so 檔案為 cpython-312 版本。
 
 ### Q: Python 模組匯入錯誤
-A: 檢查 PYTHONPATH 和 LD_LIBRARY_PATH 環境變數設定。
+A: 檢查 PYTHONPATH 和 LD_LIBRARY_PATH 環境變數設定，確認 Python 3.12 環境正確。
 
 ## 授權
 

@@ -1,0 +1,65 @@
+[package]
+name = "rshioaji"
+version = "0.1.0"
+authors = ["Steve Lo <info@sd.idv.tw>"]
+edition = "2021"
+
+[dependencies]
+# Python FFI
+pyo3 = { version = "0.20", features = ["auto-initialize"] }
+# Async runtime
+tokio = { version = "1.0", features = ["full"] }
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+# Logging
+log = "0.4"
+env_logger = "0.10"
+# Command line
+clap = { version = "4.0", features = ["derive"] }
+# Async traits
+async-trait = "0.1"
+
+[lib]
+name = "rshioaji"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "rshioaji-cli"
+path = "src/main.rs"
+
+# Platform-specific configurations
+[target.'cfg(target_os = "macos")'.dependencies]
+# macOS-specific dependencies if needed
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific dependencies if needed
+
+# Target-specific configurations for Python wheel compatibility
+[target.aarch64-apple-darwin]
+# macOS ARM64 (Apple Silicon)
+
+[target.x86_64-unknown-linux-gnu]
+# Linux x86_64 (manylinux compatible)
+
+# Build dependencies
+[build-dependencies]
+cc = "1.0"
+pkg-config = "0.3"
+
+# Static linking configuration
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+opt-level = 3
+
+[features]
+default = []
+static-link = []
+
