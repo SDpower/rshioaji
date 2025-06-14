@@ -11,12 +11,20 @@ pub enum Platform {
 impl Platform {
     /// Detect the current platform
     pub fn detect() -> Self {
-        if cfg!(target_os = "macos") && cfg!(target_arch = "aarch64") {
-            Platform::MacOSArm
-        } else if cfg!(target_os = "linux") && cfg!(target_arch = "x86_64") {
-            Platform::LinuxX86_64
-        } else {
-            Platform::Unknown
+        // Try environment variable override first
+        if let Ok(platform_override) = std::env::var("RSHIOAJI_PLATFORM") {
+            match platform_override.as_str() {
+                "macosx_arm" => return Platform::MacOSArm,
+                "manylinux_x86_64" => return Platform::LinuxX86_64,
+                _ => {} // Fall through to auto-detection
+            }
+        }
+        
+        // Use runtime detection instead of compile-time cfg! macros
+        match (std::env::consts::OS, std::env::consts::ARCH) {
+            ("macos", "aarch64") => Platform::MacOSArm,
+            ("linux", "x86_64") => Platform::LinuxX86_64,
+            _ => Platform::Unknown,
         }
     }
     

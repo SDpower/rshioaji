@@ -15,8 +15,12 @@ serde_json = "1.0"
 # Error handling
 thiserror = "1.0"
 anyhow = "1.0"
-# Date/time
+# Date/time with speed optimizations
 chrono = { version = "0.4", features = ["serde"] }
+# Base58 encoding/decoding (equivalent to based58)
+bs58 = "0.5"
+# Environment variables and .env file support
+dotenvy = "0.15"
 # Logging
 log = "0.4"
 env_logger = "0.10"
@@ -62,4 +66,6 @@ opt-level = 3
 [features]
 default = []
 static-link = []
+# Speed optimizations (equivalent to shioaji[speed])
+speed = ["chrono/clock"]
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Build script for rshioaji Docker images with Python 3.12 support
+# Build script for rshioaji Docker images with lightweight base images
 
 set -e
 
@@ -8,16 +8,20 @@ set -e
 PLATFORM=${1:-"linux"}
 
 if [ "$PLATFORM" = "linux" ] || [ "$PLATFORM" = "x86_64" ]; then
-    echo "🐳 Building rshioaji Docker image for manylinux_x86_64 with Python 3.12..."
-    docker build -t rshioaji:manylinux-x86_64 -f Dockerfile .
-    IMAGE_TAG="rshioaji:manylinux-x86_64"
+    echo "🐳 Building lightweight rshioaji Docker image for Linux x86_64..."
+    docker build -t rshioaji:linux-x86_64 -f Dockerfile .
+    IMAGE_TAG="rshioaji:linux-x86_64"
+elif [ "$PLATFORM" = "alpine" ]; then
+    echo "🏔️ Building ultra-lightweight rshioaji Docker image with Alpine Linux..."
+    docker build -t rshioaji:alpine -f Dockerfile.alpine .
+    IMAGE_TAG="rshioaji:alpine"
 elif [ "$PLATFORM" = "macos" ] || [ "$PLATFORM" = "arm64" ]; then
-    echo "🐳 Building rshioaji Docker image for macOS ARM64 with Python 3.12..."
+    echo "🐳 Building rshioaji Docker image for macOS ARM64..."
     docker build -t rshioaji:macos-arm64 -f Dockerfile.macos .
     IMAGE_TAG="rshioaji:macos-arm64"
 else
     echo "❌ Unsupported platform: $PLATFORM"
-    echo "Supported platforms: linux, x86_64, macos, arm64"
+    echo "Supported platforms: linux, x86_64, alpine, macos, arm64"
     exit 1
 fi
 
@@ -39,17 +43,19 @@ docker images | grep rshioaji
 
 echo ""
 echo "🚀 Usage Examples:"
-echo "  Linux x86_64: docker run --rm -it rshioaji:manylinux-x86_64"
-echo "  macOS ARM64:  docker run --rm -it rshioaji:macos-arm64"
+echo "  Linux x86_64:    docker run --rm -v \$(pwd)/.env:/app/.env:ro rshioaji:linux-x86_64 --stock 2330"
+echo "  Alpine Linux:    docker run --rm -v \$(pwd)/.env:/app/.env:ro rshioaji:alpine --stock 2330"
+echo "  macOS ARM64:     docker run --rm -v \$(pwd)/.env:/app/.env:ro rshioaji:macos-arm64 --stock 2330"
 echo ""
-echo "📁 To mount a config directory:"
-echo "  docker run --rm -it -v \$(pwd)/config:/app/config $IMAGE_TAG"
+echo "📁 Environment Variables:"
+echo "  docker run --rm -e SHIOAJI_API_KEY=key -e SHIOAJI_SECRET_KEY=secret $IMAGE_TAG --stock 2330"
 echo ""
-echo "🐍 Python 3.12 Support:"
-echo "  - Compatible with Python 3.12 wheels"
-echo "  - Supports cpython-312-darwin.so (macOS ARM64)"
-echo "  - Supports cpython-312-x86_64-linux-gnu.so (Linux x86_64)"
+echo "🏔️ Image Sizes (actual):"
+echo "  Alpine Linux:    ~50MB (ultra-lightweight, limited Python support)"
+echo "  Debian Slim:     ~162MB (lightweight, full Python support)"
+echo "  macOS ARM64:     ~100MB (development environment)"
 echo ""
 echo "🔧 Build for different platforms:"
-echo "  ./docker-build.sh linux   # or x86_64"
-echo "  ./docker-build.sh macos   # or arm64"
+echo "  ./docker-build.sh linux   # Debian slim (~162MB, recommended)"
+echo "  ./docker-build.sh alpine  # Alpine Linux (~50MB, experimental)"
+echo "  ./docker-build.sh macos   # macOS ARM64 (~100MB, development)"

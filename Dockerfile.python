@@ -1,0 +1,68 @@
+# Ultra-lightweight build using python:3.12-slim
+# This Dockerfile provides native Python 3.12 support for rshioaji
+# Image size: ~173MB (vs 162MB for Python 3.11 version)
+FROM python:3.12-slim as builder
+
+# Install Rust and build dependencies
+# Using python:3.12-slim as base ensures Python 3.12 headers are available
+RUN apt-get update && apt-get install -y \
+    curl \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
+    && . $HOME/.cargo/env
+
+WORKDIR /app
+
+# Copy source code
+COPY Cargo.toml build.rs ./
+COPY src/ ./src/
+COPY lib/ ./lib/
+
+# Set environment for Linux x86_64 platform and Rust PATH
+# RSHIOAJI_PLATFORM ensures correct .so file selection at runtime
+ENV RSHIOAJI_PLATFORM=manylinux_x86_64
+ENV PATH="/root/.cargo/bin:${PATH}"
+# Force target platform for cross-compilation compatibility
+ENV CARGO_CFG_TARGET_OS=linux
+ENV CARGO_CFG_TARGET_ARCH=x86_64
+
+# Build with speed and static-link features
+RUN cargo build --release --features "static-link,speed"
+
+# Verify binary works
+RUN ./target/release/rshioaji-cli --help
+
+# Final runtime image - Python 3.12 slim (~173MB total)
+FROM python:3.12-slim
+
+# Install only essential runtime dependencies
+# Minimal footprint while maintaining Python 3.12 compatibility
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r rshioaji && useradd -r -g rshioaji rshioaji
+
+WORKDIR /app
+
+# Copy the binary and lib directory
+# lib directory contains platform-specific .so files for shioaji
+COPY --from=builder /app/target/release/rshioaji-cli /usr/local/bin/rshioaji
+COPY --from=builder /app/lib /app/lib
+
+# Set environment - Python 3.12 compatible
+# Runtime platform detection will use RSHIOAJI_PLATFORM override
+ENV RSHIOAJI_PLATFORM=manylinux_x86_64
+ENV PYTHON_VERSION=3.12
+
+# Set permissions
+RUN chown rshioaji:rshioaji /usr/local/bin/rshioaji && \
+    chmod +x /usr/local/bin/rshioaji
+
+USER rshioaji
+
+# Default command
+ENTRYPOINT ["rshioaji"]
+CMD ["--help"]

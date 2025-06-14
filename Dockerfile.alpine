@@ -1,0 +1,55 @@
+# Ultra-lightweight Alpine Linux build for rshioaji
+FROM rust:1.75-alpine as builder
+
+# Install Alpine build dependencies
+RUN apk add --no-cache \
+    musl-dev \
+    openssl-dev \
+    pkgconfig \
+    python3-dev \
+    build-base
+
+WORKDIR /app
+
+# Copy source code
+COPY Cargo.toml build.rs ./
+COPY src/ ./src/
+COPY lib/ ./lib/
+
+# Set environment for Linux x86_64 platform
+ENV RSHIOAJI_PLATFORM=manylinux_x86_64
+ENV RUSTFLAGS="-C target-feature=-crt-static"
+
+# Build with speed features only (static-link might conflict with musl)
+RUN cargo build --release --features "speed"
+
+# Verify binary works
+RUN ./target/release/rshioaji-cli --help
+
+# Final runtime image - minimal Alpine
+FROM alpine:3.19
+
+# Install minimal runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    libgcc \
+    && addgroup -g 1000 rshioaji \
+    && adduser -D -s /bin/sh -u 1000 -G rshioaji rshioaji
+
+WORKDIR /app
+
+# Copy the binary
+COPY --from=builder /app/target/release/rshioaji-cli /usr/local/bin/rshioaji
+
+# Set environment
+ENV RSHIOAJI_PLATFORM=manylinux_x86_64
+
+# Set permissions
+RUN chown rshioaji:rshioaji /usr/local/bin/rshioaji && \
+    chmod +x /usr/local/bin/rshioaji
+
+USER rshioaji
+
+# Default command
+ENTRYPOINT ["rshioaji"]
+CMD ["--help"]

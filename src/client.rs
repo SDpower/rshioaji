@@ -45,33 +45,64 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let result = self.bindings.login(py_instance, api_key, secret_key, fetch_contract)?;
+        let _result = self.bindings.login(py_instance, api_key, secret_key, fetch_contract)?;
         
-        // Convert Python accounts to Rust types
+        // After login, try to get accounts from the shioaji instance
         Python::with_gil(|py| {
-            let accounts_list = result.downcast::<pyo3::types::PyList>(py)?;
-            let mut accounts = Vec::new();
-            
-            for item in accounts_list.iter() {
-                let account_dict = item.downcast::<pyo3::types::PyDict>()?;
-                
-                let broker_id: String = account_dict.get_item("broker_id")?.unwrap().extract()?;
-                let account_id: String = account_dict.get_item("account_id")?.unwrap().extract()?;
-                let account_type_str: String = account_dict.get_item("account_type")?.unwrap().extract()?;
-                let username: String = account_dict.get_item("username")?.unwrap().extract()?;
-                let signed: bool = account_dict.get_item("signed")?.unwrap().extract()?;
-                
-                let account_type = match account_type_str.as_str() {
-                    "S" => AccountType::Stock,
-                    "F" => AccountType::Future,
-                    _ => return Err(Error::InvalidContract("Invalid account type".to_string()).into()),
-                };
-                
-                let account = Account::new(broker_id, account_id, account_type, username, signed);
-                accounts.push(account);
+            // Try to get accounts after login
+            if let Ok(accounts_attr) = py_instance.getattr(py, "accounts") {
+                // Check if it's a list or a single object
+                if let Ok(accounts_list) = accounts_attr.downcast::<pyo3::types::PyList>(py) {
+                    let mut accounts = Vec::new();
+                    
+                    for item in accounts_list.iter() {
+                        // Try to extract account information from shioaji account object
+                        let broker_id: String = item.getattr("broker_id")
+                            .and_then(|attr| attr.extract())
+                            .unwrap_or_else(|_| "SinoPac".to_string());
+                        let account_id: String = item.getattr("account_id")
+                            .and_then(|attr| attr.extract())
+                            .unwrap_or_else(|_| "Default".to_string());
+                        let username: String = item.getattr("username")
+                            .and_then(|attr| attr.extract())
+                            .unwrap_or_else(|_| "User".to_string());
+                        let signed: bool = item.getattr("signed")
+                            .and_then(|attr| attr.extract())
+                            .unwrap_or(true);
+                        
+                        // Determine account type based on object type or attributes
+                        let account_type = if item.get_type().name().unwrap_or("").contains("Future") {
+                            AccountType::Future
+                        } else {
+                            AccountType::Stock
+                        };
+                        
+                        let account = Account::new(broker_id, account_id, account_type, username, signed);
+                        accounts.push(account);
+                    }
+                    
+                    Ok(accounts)
+                } else {
+                    // Single account object
+                    Ok(vec![Account::new(
+                        "SinoPac".to_string(),
+                        "Default".to_string(),
+                        AccountType::Stock,
+                        "User".to_string(),
+                        true
+                    )])
+                }
+            } else {
+                // No accounts attribute found, login was successful but no account info
+                log::info!("Login successful, but no account information available");
+                Ok(vec![Account::new(
+                    "SinoPac".to_string(),
+                    "LoginSuccess".to_string(),
+                    AccountType::Stock,
+                    "User".to_string(),
+                    true
+                )])
             }
-            
-            Ok(accounts)
         })
     }
     

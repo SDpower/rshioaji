@@ -1,7 +1,7 @@
 use clap::Parser;
 use env_logger;
 use log::info;
-use rshioaji::{Shioaji, Exchange, Action, OrderType, StockPriceType};
+use rshioaji::{Shioaji, Exchange, Action, OrderType, StockPriceType, Config};
 use std::collections::HashMap;
 use tokio;
 
@@ -12,16 +12,20 @@ struct Cli {
     #[arg(short, long)]
     simulation: bool,
     
-    /// API key for authentication
+    /// API key for authentication (can also use SHIOAJI_API_KEY env var)
     #[arg(long)]
     api_key: Option<String>,
     
-    /// Secret key for authentication
+    /// Secret key for authentication (can also use SHIOAJI_SECRET_KEY env var)
     #[arg(long)]
     secret_key: Option<String>,
     
+    /// Path to .env file (default: .env)
+    #[arg(long)]
+    env_file: Option<String>,
+    
     /// Stock code to query
-    #[arg(short, long)]
+    #[arg(long)]
     stock: Option<String>,
     
     /// Enable debug logging
@@ -44,16 +48,53 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     info!("Starting rshioaji CLI");
     
+    // Load configuration from environment variables or .env file
+    let config = if let Some(env_file) = &cli.env_file {
+        info!("Loading configuration from .env file: {}", env_file);
+        Config::from_env_file(env_file)
+    } else {
+        Config::from_env()
+    };
+    
+    // Use command line arguments if provided, otherwise use environment variables
+    let (api_key, secret_key, simulation) = match (&cli.api_key, &cli.secret_key) {
+        (Some(api), Some(secret)) => {
+            info!("Using API credentials from command line arguments");
+            (api.clone(), secret.clone(), cli.simulation)
+        }
+        _ => {
+            match config {
+                Ok(cfg) => {
+                    info!("Using API credentials from environment variables");
+                    info!("Configuration: {}", cfg.summary());
+                    if let Err(e) = cfg.validate() {
+                        eprintln!("Configuration validation failed: {}", e);
+                        std::process::exit(1);
+                    }
+                    (cfg.api_key, cfg.secret_key, cfg.simulation)
+                }
+                Err(e) => {
+                    eprintln!("Failed to load configuration: {}", e);
+                    eprintln!("Please provide API credentials via:");
+                    eprintln!("  1. Command line: --api-key YOUR_KEY --secret-key YOUR_SECRET");
+                    eprintln!("  2. Environment variables: SHIOAJI_API_KEY and SHIOAJI_SECRET_KEY");
+                    eprintln!("  3. .env file with the above variables");
+                    std::process::exit(1);
+                }
+            }
+        }
+    };
+    
     // Create Shioaji client
     let proxies = HashMap::new();
-    let client = Shioaji::new(cli.simulation, proxies)?;
+    let client = Shioaji::new(simulation, proxies)?;
     
     // Initialize the client
     client.init().await?;
     info!("Shioaji client initialized");
     
-    // Login if credentials provided
-    if let (Some(api_key), Some(secret_key)) = (cli.api_key, cli.secret_key) {
+    // Login with credentials
+    if !api_key.is_empty() && !secret_key.is_empty() {
         info!("Logging in...");
         let accounts = client.login(&api_key, &secret_key, true).await?;
         info!("Login successful! Found {} accounts", accounts.len());
@@ -122,7 +163,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             log::warn!("Logout may have failed");
         }
     } else {
-        info!("No credentials provided. Use --api-key and --secret-key to login.");
+        info!("No valid credentials found.");
+        info!("Please provide API credentials via:");
+        info!("  1. Command line: --api-key YOUR_KEY --secret-key YOUR_SECRET");
+        info!("  2. Environment variables: SHIOAJI_API_KEY and SHIOAJI_SECRET_KEY");
+        info!("  3. .env file with the above variables");
         info!("Example usage:");
         info!("  rshioaji-cli --simulation --api-key YOUR_KEY --secret-key YOUR_SECRET --stock 2330");
     }

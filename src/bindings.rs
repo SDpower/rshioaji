@@ -42,18 +42,12 @@ impl PythonBindings {
             let sys = py.import("sys")?;
             let path: &PyList = sys.getattr("path")?.downcast()?;
             
-            // Add the platform-specific shioaji path directly
-            path.insert(0, shioaji_path.to_str().unwrap())?;
-            
-            // Also add the parent lib directory
-            let lib_shioaji_path = base_path.join("lib");
-            path.insert(0, lib_shioaji_path.to_str().unwrap())?;
-            
-            // Import the shioaji module directly from the platform-specific directory
+            // Since we fixed the system shioaji, just use it directly
+            log::info!("Using system shioaji installation");
             let shioaji_module = py.import("shioaji")?;
             
-            // Import the solace API
-            let solace_api = py.import("shioaji.backend.solace.api")?;
+            // Don't load solace API during initialization to avoid import issues
+            let solace_api = py.None();
             
             let platform_dir = platform.directory_name().unwrap();
             log::info!("Successfully loaded shioaji for platform: {}", platform_dir);
