@@ -3,6 +3,20 @@ name = "rshioaji"
 version = "0.1.0"
 authors = ["Steve Lo <info@sd.idv.tw>"]
 edition = "2021"
+description = "Rust wrapper for Taiwan Shioaji API - A high-performance trading library"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+homepage = "https://github.com/stevelo/rshioaji"
+repository = "https://github.com/stevelo/rshioaji"
+documentation = "https://docs.rs/rshioaji"
+keywords = ["shioaji", "trading", "taiwan", "stock", "api"]
+categories = ["api-bindings", "finance"]
+exclude = [
+    ".env*",
+    "docker-build.sh",
+    "Dockerfile*",
+    ".dockerignore"
+]
 
 [dependencies]
 # Python FFI

@@ -5,10 +5,10 @@ use crate::platform::Platform;
 
 /// FFI bindings to Python shioaji C extensions
 pub struct PythonBindings {
-    py: Python<'static>,
+    _py: Python<'static>,
     shioaji_module: PyObject,
-    solace_api: PyObject,
-    platform: Platform,
+    _solace_api: PyObject,
+    _platform: Platform,
 }
 
 impl PythonBindings {
@@ -40,7 +40,7 @@ impl PythonBindings {
             
             // Add the platform-specific lib path to Python sys.path
             let sys = py.import("sys")?;
-            let path: &PyList = sys.getattr("path")?.downcast()?;
+            let _path: &PyList = sys.getattr("path")?.downcast()?;
             
             // Since we fixed the system shioaji, just use it directly
             log::info!("Using system shioaji installation");
@@ -53,10 +53,10 @@ impl PythonBindings {
             log::info!("Successfully loaded shioaji for platform: {}", platform_dir);
             
             Ok(Self {
-                py: unsafe { std::mem::transmute(py) },
+                _py: unsafe { std::mem::transmute(py) },
                 shioaji_module: shioaji_module.into(),
-                solace_api: solace_api.into(),
-                platform,
+                _solace_api: solace_api.into(),
+                _platform: platform,
             })
         })
     }
