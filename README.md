@@ -2,7 +2,11 @@
 
 一個用 Rust 封裝台灣永豐金證券 shioaji API 的高效能交易程式庫，支援多平台部署。
 
-**P.O.C (Proof of Concept) 專案**
+[![Crates.io](https://img.shields.io/crates/v/rshioaji.svg)](https://crates.io/crates/rshioaji)
+[![Documentation](https://docs.rs/rshioaji/badge.svg)](https://docs.rs/rshioaji)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/stevelo/rshioaji)
+
+**✅ 已成功發佈至 [crates.io](https://crates.io/crates/rshioaji)**
 
 ## 開發者資訊
 
@@ -20,12 +24,50 @@
 - ⚡ **非同步**：基於 tokio 實現非同步操作
 - 🛡️ **型別安全**：完整的 Rust 型別定義，編譯時錯誤檢查
 
+## 📦 安裝
+
+### 從 crates.io 安裝 (推薦)
+
+在您的 `Cargo.toml` 中添加：
+
+```toml
+[dependencies]
+# 基本版本
+rshioaji = "0.1.0"
+
+# 啟用高效能功能 (推薦)
+rshioaji = { version = "0.1.0", features = ["speed"] }
+
+# 啟用所有功能
+rshioaji = { version = "0.1.0", features = ["speed", "static-link"] }
+```
+
+### 可用功能 (Features)
+
+| 功能 | 描述 | 用途 |
+|------|------|------|
+| `speed` | 🚀 高效能時間處理 | 等效於 Python `shioaji[speed]`，提升日期時間處理效能 |
+| `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
+
+### 編譯選項
+
+```bash
+# 基本編譯
+cargo build
+
+# 啟用高效能功能
+cargo build --features speed
+
+# 生產環境編譯 (推薦)
+cargo build --release --features "speed,static-link"
+```
+
 ## 支援平台
 
 - **macOS ARM64** (`macosx_arm`)
 - **Linux x86_64** (`manylinux_x86_64`)
 
-## 安裝需求
+## 開發環境需求
 
 ### 系統需求
 - Rust 1.75+
@@ -37,11 +79,60 @@
 - tokio 1.0+
 - serde 1.0+
 
-## 快速開始
+## 🚀 快速開始
+
+### 1. 安裝套件
+
+```bash
+# 創建新的 Rust 專案
+cargo new my-trading-app
+cd my-trading-app
+
+# 編輯 Cargo.toml 添加依賴
+```
+
+```toml
+[dependencies]
+rshioaji = { version = "0.1.0", features = ["speed"] }
+tokio = { version = "1.0", features = ["full"] }
+```
+
+### 2. 基本使用範例
+
+```rust
+use rshioaji::{Shioaji, Config, Exchange, QuoteType};
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 從環境變數載入配置
+    let config = Config::from_env()?;
+    
+    // 創建客戶端
+    let client = Shioaji::new(config.simulation, HashMap::new())?;
+    client.init().await?;
+    
+    // 登入
+    let accounts = client.login(&config.api_key, &config.secret_key, true).await?;
+    println!("登入成功！帳戶數量: {}", accounts.len());
+    
+    // 創建股票合約並訂閱
+    let stock = client.create_stock("2330", Exchange::TSE);
+    client.subscribe(stock.contract.clone(), QuoteType::Tick).await?;
+    
+    // 取得歷史資料
+    let kbars = client.kbars(stock.contract, "2024-01-01", "2024-01-31").await?;
+    println!("取得 {} 筆 K 線資料", kbars.data.len());
+    
+    Ok(())
+}
+```
+
+## 從源碼編譯 (開發者)
 
 ### 1. 克隆專案
 ```bash
-git clone <repository-url>
+git clone https://github.com/stevelo/rshioaji
 cd rshioaji
 ```
 
@@ -81,20 +172,14 @@ cargo build --release --features "static-link,speed"
 
 ### 3. 環境變數配置
 
-#### 創建 .env 檔案
+創建 `.env` 檔案或設定環境變數：
+
 ```bash
-# 複製範例檔案
-cp .env.example .env
-
-# 編輯 .env 檔案，填入您的真實 API 憑證
-vim .env
-```
-
-.env 檔案內容：
-```
+# .env 檔案範例
 SHIOAJI_API_KEY=您的實際API金鑰
 SHIOAJI_SECRET_KEY=您的實際密鑰
 SHIOAJI_SIMULATION=false
+RUST_LOG=info
 ```
 
 #### 支援的環境變數
@@ -103,35 +188,71 @@ SHIOAJI_SIMULATION=false
 - `SHIOAJI_SIMULATION` 或 `SIMULATION` - 模擬模式 (true/false)
 - `RUST_LOG` - 日誌等級 (debug/info/warn/error)
 
-### 4. 執行範例
+### 4. 執行程式
 
-#### CLI 工具使用
 ```bash
+# 基本執行
+cargo run
+
+# 啟用高效能功能
+cargo run --features speed
+
+# 生產環境執行
+cargo run --release --features "speed,static-link"
+```
+
+## 📚 使用範例
+
+### 完整交易範例
+
+```rust
+use rshioaji::{Shioaji, Config, Exchange, Action, OrderType, StockPriceType, Order};
+use std::collections::HashMap;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 載入配置
+    let config = Config::from_env()?;
+    let client = Shioaji::new(config.simulation, HashMap::new())?;
+    client.init().await?;
+    
+    // 登入
+    let accounts = client.login(&config.api_key, &config.secret_key, true).await?;
+    
+    // 創建股票合約
+    let stock = client.create_stock("2330", Exchange::TSE);
+    
+    // 創建買單
+    let order = Order::new(
+        Action::Buy,
+        100.0,  // 價格
+        1000,   // 數量
+        OrderType::ROD,
+        StockPriceType::LMT,
+    );
+    
+    // 下單 (注意：這會實際下單，請謹慎使用)
+    let trade = client.place_order(stock.contract, order).await?;
+    println!("委託成功：{:?}", trade);
+    
+    Ok(())
+}
+```
+
+### CLI 工具使用 (從源碼)
+
+```bash
+# 編譯 CLI 工具
+cargo build --bin rshioaji-cli --release
+
 # 查看幫助
 ./target/release/rshioaji-cli --help
 
-# 使用 .env 檔案查詢股票
+# 查詢股票資料
 ./target/release/rshioaji-cli --stock 2330
 
-# 使用環境變數
-export SHIOAJI_API_KEY=your_key
-export SHIOAJI_SECRET_KEY=your_secret
+# 啟用除錯模式
 ./target/release/rshioaji-cli --debug --stock 2330
-
-# 指定模擬模式
-./target/release/rshioaji-cli --simulation --stock 2330 --debug
-```
-
-#### 範例程式
-```bash
-# 平台檢測測試
-cargo run --example simple_test
-
-# 基本使用範例  
-cargo run --example basic_usage
-
-# 環境變數配置範例
-cargo run --example env_config_example
 ```
 
 ## Docker 部署
@@ -243,83 +364,53 @@ docker-compose logs -f rshioaji
 | rshioaji:alpine | 50MB | 資源受限環境 | ⚠️ 基本支援 |
 | rshioaji:macos | 100MB | 開發環境 | ✅ 完整支援 |
 
-## API 使用
+## 📖 API 使用指南
 
-### 初始化客戶端
+### 基本配置
 
 ```rust
 use rshioaji::{Shioaji, Config};
 use std::collections::HashMap;
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 方法 1: 使用環境變數自動載入配置
-    let config = Config::from_env()?;
-    let client = Shioaji::new(config.simulation, HashMap::new())?;
-    
-    // 初始化
-    client.init().await?;
-    
-    // 使用配置中的憑證登入
-    let accounts = client.login(&config.api_key, &config.secret_key, true).await?;
-    println!("登入成功！帳戶數量: {}", accounts.len());
-    
-    Ok(())
-}
+// 方法 1: 從環境變數載入 (推薦)
+let config = Config::from_env()?;
+let client = Shioaji::new(config.simulation, HashMap::new())?;
+
+// 方法 2: 手動配置
+let client = Shioaji::new(true, HashMap::new())?; // true = 模擬模式
 ```
 
-#### 手動指定憑證
+### 市場資料操作
 
 ```rust
-use rshioaji::Shioaji;
-use std::collections::HashMap;
+use rshioaji::{Exchange, QuoteType};
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 方法 2: 手動指定憑證
-    let client = Shioaji::new(true, HashMap::new())?;
-    client.init().await?;
-    
-    // 直接指定憑證
-    let accounts = client.login("your_api_key", "your_secret_key", true).await?;
-    println!("登入成功！帳戶數量: {}", accounts.len());
-    
-    Ok(())
-}
+// 創建合約
+let stock = client.create_stock("2330", Exchange::TSE);
+
+// 訂閱即時報價
+client.subscribe(stock.contract.clone(), QuoteType::Tick).await?;
+
+// 取得歷史 K 線
+let kbars = client.kbars(stock.contract, "2024-01-01", "2024-01-31").await?;
 ```
 
 ### 下單操作
 
 ```rust
-use rshioaji::types::*;
+use rshioaji::{Action, OrderType, StockPriceType, Order};
 
-// 建立股票合約
-let stock = client.create_stock("2330", Exchange::TSE);
-let contract = Contract::Stock(stock);
-
-// 建立委託單
+// 創建委託單
 let order = Order::new(
-    Action::Buy,
-    100.0,
-    1000,
-    OrderType::ROD,
-    PriceType::LMT,
+    Action::Buy,           // 買賣別
+    100.0,                // 價格
+    1000,                 // 數量
+    OrderType::ROD,       // 委託類型
+    StockPriceType::LMT,  // 價格類型
 );
 
-// 下單
-let trade = client.place_order(contract, order).await?;
-println!("委託成功：{:?}", trade);
-```
-
-### 市場資料
-
-```rust
-// 訂閱報價
-client.subscribe(contract.clone(), QuoteType::Tick).await?;
-
-// 取得歷史K線
-let kbars = client.kbars(contract, "2024-01-01", "2024-01-31").await?;
-println!("K線資料筆數: {}", kbars.data.len());
+// 送出委託
+let trade = client.place_order(stock.contract, order).await?;
 ```
 
 ## 專案結構
@@ -429,35 +520,80 @@ A: 檢查 PYTHONPATH 和 LD_LIBRARY_PATH 環境變數設定，確認 Python 3.12
 如有任何問題或建議，請聯絡：
 - **Steve Lo** - info@sd.idv.tw
 
-## ✅ 實際測試驗證
+## 🎯 進階使用
 
-**rshioaji 已成功通過真實 shioaji API 測試：**
+### 功能開關
 
-- **🔐 API 認證**: 真實憑證登入並獲取帳戶資訊
-- **📊 市場資料**: 成功查詢台積電 (2330) 市場資料  
-- **📈 資料訂閱**: K 線和 tick 資料請求正常運作
-- **🔧 配置管理**: .env 檔案載入和驗證完全正常
-- **🐳 Docker 優化**: 超輕量容器 (162MB，減少 91.3% 大小)
-- **🏔️ 多版本支援**: 生產版 162MB | 超輕量版 50MB | 開發版 100MB
-- **🌐 跨平台**: macOS ARM64 和 Linux x86_64 驗證通過
+```bash
+# 啟用高效能模式 (推薦生產環境)
+cargo build --release --features speed
 
-### 測試證據
+# 啟用靜態連結 (單一執行檔)
+cargo build --release --features static-link
 
-```
-✅ Successfully loaded environment variables from .env
-✅ Configuration validated successfully  
-✅ Successfully loaded shioaji for platform: macosx_arm
-✅ Shioaji client initialized
-✅ Login successful! Found 1 accounts
-✅ Fetching data for stock: 2330
+# 同時啟用多個功能
+cargo build --release --features "speed,static-link"
 ```
 
-**結論**: rshioaji 是一個功能完整、可用於生產環境的 Rust shioaji 客戶端！
+### 效能優化
+
+```rust
+// 使用 speed 功能時，自動啟用：
+// - 高效能日期時間處理 (等效於 ciso8601)
+// - 優化的 base58 編碼 (等效於 based58)
+// - 其他 Rust 原生高效能實作
+
+// 無需額外程式碼，編譯時自動優化
+```
+
+## ✅ 生產驗證
+
+**rshioaji 已成功發佈至 crates.io 並通過完整測試：**
+
+- **📦 crates.io**: [https://crates.io/crates/rshioaji](https://crates.io/crates/rshioaji)
+- **📚 文件**: [https://docs.rs/rshioaji](https://docs.rs/rshioaji)
+- **🔐 API 認證**: 真實憑證登入測試通過
+- **📊 市場資料**: 成功查詢台積電 (2330) 資料
+- **📈 即時訂閱**: K 線和 tick 資料正常運作
+- **🌐 跨平台**: macOS ARM64 和 Linux x86_64 支援
+- **🚀 高效能**: speed 功能提升處理效能
+
+### 安裝驗證
+
+```bash
+# 創建測試專案
+cargo new test-rshioaji && cd test-rshioaji
+
+# 添加依賴
+echo 'rshioaji = { version = "0.1.0", features = ["speed"] }' >> Cargo.toml
+
+# 編譯測試
+cargo build
+```
+
+## 🔗 相關連結
+
+- **📦 crates.io**: [https://crates.io/crates/rshioaji](https://crates.io/crates/rshioaji)
+- **📚 API 文件**: [https://docs.rs/rshioaji](https://docs.rs/rshioaji)  
+- **🐙 GitHub**: [https://github.com/stevelo/rshioaji](https://github.com/stevelo/rshioaji)
+- **📧 聯絡**: info@sd.idv.tw
+
+## 📊 套件資訊
+
+```toml
+[dependencies]
+rshioaji = "0.1.0"  # 最新版本
+```
+
+- **版本**: 0.1.0
+- **授權**: MIT OR Apache-2.0
+- **平台**: macOS ARM64, Linux x86_64  
+- **Rust 版本**: 1.75+
 
 ---
 
-**重要聲明**: 
-- 此為概念驗證 (P.O.C) 專案，但已通過完整功能驗證
+**⚠️ 重要聲明**: 
+- 此套件已通過完整功能驗證並發佈至 crates.io
 - 正式交易前請充分測試，開發者不承擔任何交易損失責任
-- 此專案需要有效的永豐金證券 API 金鑰才能正常運作
+- 需要有效的永豐金證券 API 金鑰才能正常運作
 - 請向永豐金證券申請相關授權並遵守其使用條款
