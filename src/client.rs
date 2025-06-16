@@ -5,6 +5,7 @@ use pyo3::prelude::*;
 
 use crate::bindings::PythonBindings;
 use crate::callbacks::EventHandlers;
+use crate::event_bridge::{RealEventBridge, Event};
 use crate::error::{Error, Result};
 use crate::types::*;
 
@@ -17,12 +18,17 @@ pub struct Shioaji {
     stock_account: Arc<Mutex<std::option::Option<StockAccount>>>,
     future_account: Arc<Mutex<std::option::Option<FutureAccount>>>,
     event_handlers: Arc<Mutex<EventHandlers>>,
+    real_event_bridge: Arc<RealEventBridge>,
 }
 
 impl Shioaji {
     /// Create a new Shioaji client
     pub fn new(simulation: bool, proxies: HashMap<String, String>) -> Result<Self> {
         let bindings = Arc::new(Mutex::new(PythonBindings::new()?));
+        let event_handlers = Arc::new(Mutex::new(EventHandlers::new()));
+        
+        // 建立真實事件橋接器
+        let real_event_bridge = Arc::new(RealEventBridge::new(Arc::downgrade(&event_handlers))?);
         
         Ok(Self {
             bindings,
@@ -31,7 +37,8 @@ impl Shioaji {
             proxies,
             stock_account: Arc::new(Mutex::new(None)),
             future_account: Arc::new(Mutex::new(None)),
-            event_handlers: Arc::new(Mutex::new(EventHandlers::new())),
+            event_handlers,
+            real_event_bridge,
         })
     }
     
@@ -636,20 +643,35 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        // Initialize event bridge with weak reference to handlers
+        log::info!("🔧 設定 shioaji 回調函數與真實事件橋接 (v0.3.0)");
+        
+        // 啟動真實事件橋接服務
+        self.real_event_bridge.start().await?;
+        
+        // 設定 Python 回調函數
+        self.real_event_bridge.setup_python_callbacks().await?;
+        
+        // 註冊所有類型的 Python 回調到 shioaji
+        self.register_all_shioaji_callbacks(py_instance).await?;
+        
+        // Initialize legacy event bridge for compatibility
         let handlers_weak = Arc::downgrade(&self.event_handlers);
         {
             let mut bindings = self.bindings.lock().await;
-            bindings.initialize_event_bridge(handlers_weak)?;
+            if let Err(e) = bindings.initialize_event_bridge(handlers_weak) {
+                log::warn!("Legacy event bridge initialization failed: {:?}", e);
+            }
             
-            // Setup real callbacks with Python shioaji
-            bindings.setup_real_callbacks(py_instance).await?;
+            // Setup real callbacks with Python shioaji (fallback)
+            if let Err(e) = bindings.setup_real_callbacks(py_instance).await {
+                log::warn!("Legacy callback setup failed: {:?}", e);
+            }
         }
         
         // Validate that event handlers are properly initialized
         let handlers = self.event_handlers.lock().await;
-        log::info!("✅ Event callback system initialized with Python-Rust bridging (v0.3.0)");
-        log::info!("📊 Registered handlers: tick={}, bidask={}, quote={}, order={}, system={}", 
+        log::info!("✅ 真實事件橋接與回調系統已初始化 (v0.3.0)");
+        log::info!("📊 已註冊的處理器: tick={}, bidask={}, quote={}, order={}, system={}", 
                    handlers.tick_callbacks.len(),
                    handlers.bidask_callbacks.len(), 
                    handlers.quote_callbacks.len(),
@@ -657,6 +679,68 @@ impl Shioaji {
                    handlers.system_callbacks.len());
         
         Ok(())
+    }
+
+    /// 註冊所有 shioaji 回調函數
+    async fn register_all_shioaji_callbacks(&self, py_instance: &PyObject) -> Result<()> {
+        // 先取得所有回調函數
+        let tick_callback = self.real_event_bridge.get_python_callback("tick_stk_v1").await;
+        let bidask_callback = self.real_event_bridge.get_python_callback("bidask_stk_v1").await;
+        let quote_callback = self.real_event_bridge.get_python_callback("quote_stk_v1").await;
+        let order_callback = self.real_event_bridge.get_python_callback("order").await;
+
+        Python::with_gil(|py| {
+            // 註冊 tick 回調
+            if let Some(callback) = tick_callback {
+                if let Err(e) = py_instance.call_method(py, "set_on_tick_stk_v1_callback", (callback,), None) {
+                    log::warn!("無法設定 tick_stk_v1 callback: {:?}", e);
+                }
+            }
+
+            // 註冊 bid/ask 回調
+            if let Some(callback) = bidask_callback {
+                if let Err(e) = py_instance.call_method(py, "set_on_bidask_stk_v1_callback", (callback,), None) {
+                    log::warn!("無法設定 bidask_stk_v1 callback: {:?}", e);
+                }
+            }
+
+            // 註冊 quote 回調
+            if let Some(callback) = quote_callback {
+                if let Err(e) = py_instance.call_method(py, "set_on_quote_stk_v1_callback", (callback,), None) {
+                    log::warn!("無法設定 quote_stk_v1 callback: {:?}", e);
+                }
+            }
+
+            // 註冊 order 回調
+            if let Some(callback) = order_callback {
+                if let Err(e) = py_instance.call_method(py, "set_order_callback", (callback,), None) {
+                    log::warn!("無法設定 order callback: {:?}", e);
+                }
+            }
+
+            log::info!("✅ 所有 shioaji 回調函數已註冊");
+            Ok(())
+        })
+    }
+
+    /// 取得事件橋接狀態
+    pub async fn get_event_bridge_status(&self) -> crate::event_bridge::BridgeState {
+        self.real_event_bridge.get_bridge_state().await
+    }
+
+    /// 取得事件統計
+    pub async fn get_event_statistics(&self) -> crate::event_bridge::EventStatistics {
+        self.real_event_bridge.get_event_statistics().await
+    }
+
+    /// 處理真實事件（用於測試或手動觸發）
+    pub async fn process_real_event(&self, event: Event) -> Result<()> {
+        self.real_event_bridge.process_real_event(event).await
+    }
+
+    /// 停止事件橋接服務
+    pub async fn stop_event_bridge(&self) -> Result<()> {
+        self.real_event_bridge.stop().await
     }
 
 

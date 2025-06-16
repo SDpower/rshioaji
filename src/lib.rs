@@ -10,16 +10,17 @@
 //! - ⚡ **Async Support**: Built on tokio for async operations
 //! - 🛡️ **Type Safety**: Complete Rust type definitions with compile-time checks
 //! 
-//! ## Version 0.3.0 - Full Python-Rust Event Bridging
+//! ## Version 0.3.5 - Advanced Real Event Bridging & Complete Shioaji Integration
 //! 
-//! This version introduces comprehensive Python-Rust event bridging with real callback functionality:
+//! This version introduces advanced real event bridging and complete shioaji integration:
 //! 
-//! - **TickCallback** - Handle stock and futures tick data events with real Python forwarding
-//! - **BidAskCallback** - Handle bid/ask spread events with real-time data  
-//! - **QuoteCallback** - Handle quote events with full market data
-//! - **OrderCallback** - Handle order status changes with complete state tracking
-//! - **SystemCallback** - Handle system events and connection status
-//! - **Event Bridge** - Seamless Python-Rust event forwarding with type safety
+//! - **RealEventBridge** - Advanced real-time event processing with high-frequency support
+//! - **ShioajiIntegration** - Enterprise-grade trading system integration
+//! - **SmartOrderEngine** - TWAP, conditional orders, and algorithmic trading
+//! - **RiskManager** - Real-time risk monitoring and automatic risk controls
+//! - **PerformanceTracker** - Comprehensive trading analytics and reporting
+//! - **MarketDataManager** - Advanced market data subscription and processing
+//! - **Complete Event System** - Full Python-Rust event bridging with statistics and monitoring
 //! 
 //! ## Quick Start
 //! 
@@ -60,6 +61,7 @@ pub mod config;
 pub mod error;
 pub mod event_bridge;
 pub mod platform;
+pub mod shioaji_integration;
 pub mod types;
 pub mod utils;
 
@@ -68,7 +70,9 @@ pub use callbacks::{TickCallback, BidAskCallback, QuoteCallback, OrderCallback, 
 pub use client::Shioaji;
 pub use config::Config;
 pub use error::{Error, Result};
+pub use event_bridge::{RealEventBridge, Event, BridgeState, EventStatistics};
 pub use platform::Platform;
+pub use shioaji_integration::{ShioajiIntegration, SmartOrderType, PriceSnapshot, IntegrationState};
 pub use utils::{EnvironmentConfig, init_logging, set_error_tracking, clear_outdated_contract_cache, check_contract_cache};
 
 // Re-export all types from the types module

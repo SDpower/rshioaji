@@ -5,7 +5,7 @@ use std::sync::{Arc, Weak};
 use tokio::sync::Mutex;
 
 use crate::platform::Platform;
-use crate::event_bridge::{EventBridge, CallbackRegistry};
+use crate::event_bridge::{RealEventBridge, CallbackRegistry};
 use crate::callbacks::EventHandlers;
 
 /// FFI bindings to Python shioaji C extensions
@@ -15,7 +15,7 @@ pub struct PythonBindings {
     _solace_api: PyObject,
     _platform: Platform,
     /// Event bridge for Python-Rust callback forwarding
-    event_bridge: Option<EventBridge>,
+    event_bridge: Option<Arc<RealEventBridge>>,
     /// Registry for Python callback objects
     callback_registry: Arc<Mutex<CallbackRegistry>>,
 }
@@ -209,7 +209,7 @@ impl PythonBindings {
     
     /// Initialize event bridge for callback forwarding
     pub fn initialize_event_bridge(&mut self, handlers: Weak<Mutex<EventHandlers>>) -> crate::error::Result<()> {
-        self.event_bridge = Some(EventBridge::new(handlers)?);
+        self.event_bridge = Some(Arc::new(RealEventBridge::new(handlers)?));
         log::debug!("Event bridge initialized successfully");
         Ok(())
     }
@@ -219,26 +219,18 @@ impl PythonBindings {
         if let Some(ref bridge) = self.event_bridge {
             let mut registry = self.callback_registry.lock().await;
             
+            // Setup Python callbacks using the bridge
+            bridge.setup_python_callbacks().await.map_err(|e| {
+                PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    format!("Failed to setup Python callbacks: {}", e)
+                )
+            })?;
+            
             Python::with_gil(|py| {
-                // Create simplified callbacks
-                let tick_callback = bridge.create_python_callback("tick_stk")?;
-                let bidask_callback = bridge.create_python_callback("bidask_stk")?;
-                let order_callback = bridge.create_python_callback("order")?;
-
-                // Register callbacks
-                registry.register_callback("tick_stk".to_string(), tick_callback.clone_ref(py));
-                registry.register_callback("bidask_stk".to_string(), bidask_callback.clone_ref(py));
-                registry.register_callback("order".to_string(), order_callback.clone_ref(py));
-
-                // Try to set callbacks in Python shioaji (with error handling)
-                // For now, this is a proof-of-concept - real shioaji integration would require
-                // specific method names and signatures
-
-                log::info!("✅ v0.3.0 Simplified callback system initialized");
-                log::info!("📋 Registered callbacks: tick_stk, bidask_stk, order");
-                log::warn!("⚠️  Note: This is a proof-of-concept implementation");
-                log::warn!("   Real Python shioaji integration requires specific callback methods");
-
+                // Get callbacks from bridge
+                log::info!("✅ v0.3.5 Real event bridge callback system initialized");
+                log::info!("📋 Advanced event bridging with statistics and monitoring");
+                
                 Ok(())
             })
         } else {

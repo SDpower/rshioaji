@@ -145,3 +145,13 @@ scripts/dev/logs/
 # Keep documentation
 !README*.md
 !docs/**/*.md
+
+# Shioaji library files (keep .so files, exclude others)
+/lib/**/*.py
+/lib/**/*.pyc
+/lib/**/__pycache__/
+/lib/**/*.pyo
+/lib/**/*.pyd
+
+
+*.mdc
