@@ -93,7 +93,7 @@ fn main() {
     
     // Static linking configuration
     if env::var("CARGO_FEATURE_STATIC_LINK").is_ok() {
-        embed_static_libraries(&backend_path, &solace_path, &target_os, &so_extension);
+        embed_static_libraries(&backend_path, &solace_path, &target_os, so_extension);
     } else {
         // Set up library search paths for dynamic linking
         println!("cargo:rustc-link-search=native={}", backend_path.display());
@@ -146,7 +146,7 @@ fn embed_static_libraries(backend_path: &Path, solace_path: &Path, target_os: &s
         let src = backend_path.join(lib);
         let dst = static_lib_dir.join(lib);
         if src.exists() {
-            fs::copy(&src, &dst).expect(&format!("Failed to copy {}", lib));
+            fs::copy(&src, &dst).unwrap_or_else(|_| panic!("Failed to copy {}", lib));
             println!("cargo:warning=Copied {} to static libs", lib);
         }
     }
@@ -156,7 +156,7 @@ fn embed_static_libraries(backend_path: &Path, solace_path: &Path, target_os: &s
         let src = solace_path.join(lib);
         let dst = static_lib_dir.join(lib);
         if src.exists() {
-            fs::copy(&src, &dst).expect(&format!("Failed to copy {}", lib));
+            fs::copy(&src, &dst).unwrap_or_else(|_| panic!("Failed to copy {}", lib));
             println!("cargo:warning=Copied {} to static libs", lib);
         }
     }
@@ -169,7 +169,7 @@ fn embed_static_libraries(backend_path: &Path, solace_path: &Path, target_os: &s
     println!("cargo:rustc-link-lib=static=rshioaji_embedded");
 }
 
-fn create_static_archive(lib_dir: &Path, target_os: &str) {
+fn create_static_archive(lib_dir: &Path, _target_os: &str) {
     let archive_name = "librshioaji_embedded.a";
     let archive_path = lib_dir.join(archive_name);
     
@@ -193,7 +193,7 @@ fn create_static_archive(lib_dir: &Path, target_os: &str) {
     }
     
     // Use ar to create static archive
-    let ar_cmd = if target_os == "linux" { "ar" } else { "ar" };
+    let ar_cmd = "ar";
     
     let mut cmd = Command::new(ar_cmd);
     cmd.arg("rcs").arg(&archive_path);

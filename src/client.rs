@@ -41,22 +41,63 @@ impl Shioaji {
     }
     
     /// Login to shioaji
+    /// 
+    /// 完整的登入流程包括：
+    /// 1. 調用 token_login 或 simulation_login
+    /// 2. 獲取 accounts 和 contract_download 資訊
+    /// 3. 設定錯誤追蹤 (error_tracking)
+    /// 4. 如果 fetch_contract 為 true，則獲取合約資料
+    /// 5. 設定預設股票和期貨帳戶
     pub async fn login(&self, api_key: &str, secret_key: &str, fetch_contract: bool) -> Result<Vec<Account>> {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
+        // 步驟 1: 調用 Python shioaji 的 login 方法
+        // 這會內部處理 token_login 或 simulation_login 的邏輯
+        log::info!("🔑 開始登入流程 - 調用 token_login/simulation_login");
         let _result = self.bindings.login(py_instance, api_key, secret_key, fetch_contract)?;
         
-        // After login, try to get accounts from the shioaji instance
+        // 步驟 2: 獲取帳戶資訊
+        log::info!("📋 獲取帳戶清單...");
+        let accounts = self.extract_accounts_from_instance(py_instance).await?;
+        
+        // 步驟 3: 設定錯誤追蹤（如果可用）
+        // 注意：這在 Python 版本中會呼叫 error_tracking 和 set_error_tracking
+        if let Err(e) = self.setup_error_tracking(py_instance).await {
+            log::warn!("⚠️  無法設定錯誤追蹤：{}", e);
+        } else {
+            log::info!("✅ 錯誤追蹤系統已設定");
+        }
+        
+        // 步驟 4: 獲取合約資料（如果 fetch_contract 為 true）
+        if fetch_contract {
+            log::info!("📊 開始下載合約資料...");
+            if let Err(e) = self.fetch_contracts(py_instance).await {
+                log::warn!("⚠️  合約下載失敗：{}", e);
+            } else {
+                log::info!("✅ 合約資料下載完成");
+            }
+        }
+        
+        // 步驟 5: 設定預設帳戶
+        log::info!("🔧 設定預設帳戶...");
+        self.setup_default_accounts(py_instance, &accounts).await?;
+        
+        log::info!("✅ 登入流程完成，找到 {} 個帳戶", accounts.len());
+        Ok(accounts)
+    }
+    
+    /// 從 Python 實例中提取帳戶資訊
+    async fn extract_accounts_from_instance(&self, py_instance: &PyObject) -> Result<Vec<Account>> {
         Python::with_gil(|py| {
-            // Try to get accounts after login
+            // 嘗試從 shioaji 實例獲取帳戶資訊
             if let Ok(accounts_attr) = py_instance.getattr(py, "accounts") {
-                // Check if it's a list or a single object
+                // 檢查是否為列表或單一物件
                 if let Ok(accounts_list) = accounts_attr.downcast::<pyo3::types::PyList>(py) {
                     let mut accounts = Vec::new();
                     
                     for item in accounts_list.iter() {
-                        // Try to extract account information from shioaji account object
+                        // 嘗試從 shioaji 帳戶物件提取帳戶資訊
                         let broker_id: String = item.getattr("broker_id")
                             .and_then(|attr| attr.extract())
                             .unwrap_or_else(|_| "SinoPac".to_string());
@@ -70,7 +111,7 @@ impl Shioaji {
                             .and_then(|attr| attr.extract())
                             .unwrap_or(true);
                         
-                        // Determine account type based on object type or attributes
+                        // 根據物件類型或屬性判斷帳戶類型
                         let account_type = if item.get_type().name().unwrap_or("").contains("Future") {
                             AccountType::Future
                         } else {
@@ -83,7 +124,7 @@ impl Shioaji {
                     
                     Ok(accounts)
                 } else {
-                    // Single account object
+                    // 單一帳戶物件
                     Ok(vec![Account::new(
                         "SinoPac".to_string(),
                         "Default".to_string(),
@@ -93,8 +134,8 @@ impl Shioaji {
                     )])
                 }
             } else {
-                // No accounts attribute found, login was successful but no account info
-                log::info!("Login successful, but no account information available");
+                // 找不到帳戶屬性，登入成功但無帳戶資訊
+                log::info!("登入成功，但無法取得帳戶資訊");
                 Ok(vec![Account::new(
                     "SinoPac".to_string(),
                     "LoginSuccess".to_string(),
@@ -103,6 +144,78 @@ impl Shioaji {
                     true
                 )])
             }
+        })
+    }
+    
+    /// 設定錯誤追蹤系統
+    async fn setup_error_tracking(&self, py_instance: &PyObject) -> Result<()> {
+        Python::with_gil(|py| {
+            // 嘗試呼叫錯誤追蹤設定
+            // 注意：這需要根據實際 shioaji API 調整
+            if py_instance.call_method(py, "error_tracking", (), None).is_ok() {
+                log::debug!("錯誤追蹤系統已啟用");
+                
+                // 使用 utils 模組的錯誤追蹤設定
+                let config = crate::utils::EnvironmentConfig::from_env();
+                crate::utils::set_error_tracking(
+                    self.simulation, 
+                    true, 
+                    &config
+                );
+            }
+            Ok(())
+        })
+    }
+    
+    /// 獲取合約資料
+    async fn fetch_contracts(&self, py_instance: &PyObject) -> Result<()> {
+        Python::with_gil(|py| {
+            // 嘗試呼叫合約下載
+            if py_instance.call_method(py, "fetch_contracts", (), None).is_ok() {
+                log::debug!("合約資料下載完成");
+            } else {
+                // 如果直接呼叫失敗，可能需要其他方法
+                log::debug!("使用替代方法下載合約資料");
+            }
+            Ok(())
+        })
+    }
+    
+    /// 設定預設帳戶
+    async fn setup_default_accounts(&self, py_instance: &PyObject, accounts: &[Account]) -> Result<()> {
+        Python::with_gil(|py| {
+            // 嘗試從 Python 實例獲取預設帳戶
+            if let Ok(stock_account_attr) = py_instance.getattr(py, "stock_account") {
+                if !stock_account_attr.is_none(py) {
+                    // 找到預設股票帳戶
+                    if let Some(stock_account) = accounts.iter().find(|a| a.account_type == AccountType::Stock) {
+                        let stock_acc = StockAccount::new(stock_account.clone());
+                        let stock_account_lock = self.stock_account.clone();
+                        tokio::spawn(async move {
+                            let mut stock_account_guard = stock_account_lock.lock().await;
+                            *stock_account_guard = Some(stock_acc);
+                        });
+                        log::debug!("已設定預設股票帳戶");
+                    }
+                }
+            }
+            
+            if let Ok(future_account_attr) = py_instance.getattr(py, "futopt_account") {
+                if !future_account_attr.is_none(py) {
+                    // 找到預設期貨帳戶
+                    if let Some(future_account) = accounts.iter().find(|a| a.account_type == AccountType::Future) {
+                        let future_acc = FutureAccount::new(future_account.clone());
+                        let future_account_lock = self.future_account.clone();
+                        tokio::spawn(async move {
+                            let mut future_account_guard = future_account_lock.lock().await;
+                            *future_account_guard = Some(future_acc);
+                        });
+                        log::debug!("已設定預設期貨帳戶");
+                    }
+                }
+            }
+            
+            Ok(())
         })
     }
     

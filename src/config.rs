@@ -35,7 +35,7 @@ impl Config {
     /// Load configuration from environment variables and optional .env file
     pub fn from_env() -> Result<Self, ConfigError> {
         // Try to load .env file from current directory
-        if let Ok(_) = Self::load_dotenv_file(".env") {
+        if Self::load_dotenv_file(".env").is_ok() {
             log::info!("Successfully loaded .env file");
         } else {
             log::debug!("No .env file found or failed to load, using environment variables only");
@@ -163,7 +163,7 @@ mod tests {
         
         assert_eq!(config.api_key, "test_api_key");
         assert_eq!(config.secret_key, "test_secret_key");
-        assert_eq!(config.simulation, true);
+        assert!(config.simulation);
     }
 
     #[test]
@@ -215,6 +215,6 @@ mod tests {
         let config = config.unwrap();
         assert_eq!(config.api_key, "env_test_key");
         assert_eq!(config.secret_key, "env_test_secret");
-        assert_eq!(config.simulation, false);
+        assert!(!config.simulation);
     }
 }

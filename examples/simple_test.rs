@@ -24,10 +24,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // List files in the directory
                 if let Ok(entries) = std::fs::read_dir(&shioaji_path) {
                     println!("📋 Files in shioaji directory:");
-                    for entry in entries {
-                        if let Ok(entry) = entry {
-                            println!("  - {}", entry.file_name().to_string_lossy());
-                        }
+                    for entry in entries.flatten() {
+                        println!("  - {}", entry.file_name().to_string_lossy());
                     }
                 }
                 
@@ -38,14 +36,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     if let Ok(entries) = std::fs::read_dir(&backend_path) {
                         println!("📋 Files in backend directory:");
-                        for entry in entries {
-                            if let Ok(entry) = entry {
-                                let file_name = entry.file_name().to_string_lossy().to_string();
-                                if file_name.ends_with(".so") {
-                                    println!("  ✅ {}", file_name);
-                                } else {
-                                    println!("  - {}", file_name);
-                                }
+                        for entry in entries.flatten() {
+                            let file_name = entry.file_name().to_string_lossy().to_string();
+                            if file_name.ends_with(".so") {
+                                println!("  ✅ {}", file_name);
+                            } else {
+                                println!("  - {}", file_name);
                             }
                         }
                     }
@@ -58,14 +54,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     
                     if let Ok(entries) = std::fs::read_dir(&solace_path) {
                         println!("📋 Files in solace directory:");
-                        for entry in entries {
-                            if let Ok(entry) = entry {
-                                let file_name = entry.file_name().to_string_lossy().to_string();
-                                if file_name.ends_with(".so") {
-                                    println!("  ✅ {}", file_name);
-                                } else {
-                                    println!("  - {}", file_name);
-                                }
+                        for entry in entries.flatten() {
+                            let file_name = entry.file_name().to_string_lossy().to_string();
+                            if file_name.ends_with(".so") {
+                                println!("  ✅ {}", file_name);
+                            } else {
+                                println!("  - {}", file_name);
                             }
                         }
                     }

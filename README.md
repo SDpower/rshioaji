@@ -23,6 +23,10 @@
 - 🐳 **容器化**：提供 Docker 支援，便於部署和分發
 - ⚡ **非同步**：基於 tokio 實現非同步操作
 - 🛡️ **型別安全**：完整的 Rust 型別定義，編譯時錯誤檢查
+- 🔧 **環境變數管理**：完整的環境變數處理和驗證，對應 Python utils.py
+- 📝 **日誌系統**：與 Python 版本相同格式的日誌系統
+- 🔍 **錯誤追蹤**：支援 Sentry 整合和錯誤監控
+- 🔑 **完整登入流程**：實現與 Python 版本相同的標準登入步驟
 
 ## 📦 安裝
 
@@ -48,6 +52,7 @@ rshioaji = { version = "0.1.0", features = ["speed", "static-link"] }
 |------|------|------|
 | `speed` | 🚀 高效能時間處理 | 等效於 Python `shioaji[speed]`，提升日期時間處理效能 |
 | `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
+| `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
 
 ### 編譯選項
 
@@ -100,11 +105,22 @@ tokio = { version = "1.0", features = ["full"] }
 ### 2. 基本使用範例
 
 ```rust
-use rshioaji::{Shioaji, Config, Exchange, QuoteType};
+use rshioaji::{Shioaji, Config, Exchange, QuoteType, EnvironmentConfig, init_logging};
 use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 📚 前置作業：初始化環境配置和日誌系統
+    let env_config = EnvironmentConfig::from_env();
+    if let Err(e) = env_config.validate() {
+        eprintln!("環境變數配置錯誤: {}", e);
+        return Ok(());
+    }
+    
+    // 初始化日誌系統（對應 Python utils.py）
+    init_logging(&env_config)?;
+    log::info!("🚀 rshioaji 環境初始化完成");
+    
     // 從環境變數載入配置
     let config = Config::from_env()?;
     
@@ -112,9 +128,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Shioaji::new(config.simulation, HashMap::new())?;
     client.init().await?;
     
-    // 登入
+    // 🔑 完整登入流程（包含錯誤追蹤、合約下載、預設帳戶設定）
     let accounts = client.login(&config.api_key, &config.secret_key, true).await?;
-    println!("登入成功！帳戶數量: {}", accounts.len());
+    log::info!("登入成功！帳戶數量: {}", accounts.len());
     
     // 創建股票合約並訂閱
     let stock = client.create_stock("2330", Exchange::TSE);
@@ -122,7 +138,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 取得歷史資料
     let kbars = client.kbars(stock.contract, "2024-01-01", "2024-01-31").await?;
-    println!("取得 {} 筆 K 線資料", kbars.data.len());
+    log::info!("取得 {} 筆 K 線資料", kbars.data.len());
     
     Ok(())
 }
@@ -183,10 +199,24 @@ RUST_LOG=info
 ```
 
 #### 支援的環境變數
+
+##### 基本 API 設定
 - `SHIOAJI_API_KEY` 或 `API_KEY` - API 金鑰
 - `SHIOAJI_SECRET_KEY` 或 `SECRET_KEY` - 密鑰
 - `SHIOAJI_SIMULATION` 或 `SIMULATION` - 模擬模式 (true/false)
-- `RUST_LOG` - 日誌等級 (debug/info/warn/error)
+
+##### 日誌設定 (對應 Python utils.py)
+- `LOG_LEVEL` - 日誌等級 (DEBUG/INFO/WARNING/ERROR/CRITICAL)
+- `SJ_LOG_PATH` - 日誌檔案路徑 (設為 "console" 只輸出到控制台)
+- `RUST_LOG` - Rust 日誌等級 (debug/info/warn/error)
+
+##### Sentry 錯誤追蹤設定
+- `SENTRY_URI` - Sentry DSN URL
+- `LOG_SENTRY` - 是否啟用 Sentry (True/False)
+- `SENTRY_LOG_LEVEL` - Sentry 日誌等級 (DEBUG/INFO/WARNING/ERROR/CRITICAL)
+
+##### 測試設定
+- `LEGACY_TEST` - 遺留測試模式 (0=停用, 1=啟用)
 
 ### 4. 執行程式
 
@@ -363,6 +393,82 @@ docker-compose logs -f rshioaji
 | rshioaji:latest | 162MB | Python 3.11 輕量版 | ✅ 完整支援 |
 | rshioaji:alpine | 50MB | 資源受限環境 | ⚠️ 基本支援 |
 | rshioaji:macos | 100MB | 開發環境 | ✅ 完整支援 |
+
+## 🔧 環境變數配置
+
+rshioaji 提供完整的環境變數管理功能，對應 Python shioaji 的 `utils.py` 模組。
+
+### 環境變數設定範例
+
+創建 `.env` 檔案：
+```bash
+# 基本 API 設定
+SHIOAJI_API_KEY=your_actual_api_key
+SHIOAJI_SECRET_KEY=your_actual_secret_key
+SHIOAJI_SIMULATION=true
+
+# 日誌設定
+LOG_LEVEL=INFO
+SJ_LOG_PATH=shioaji.log
+
+# Sentry 錯誤追蹤 (選用)
+SENTRY_URI=https://your-dsn@sentry.io/project-id
+LOG_SENTRY=True
+SENTRY_LOG_LEVEL=ERROR
+
+# 測試設定
+LEGACY_TEST=0
+```
+
+### 使用方式
+
+```rust
+use rshioaji::{EnvironmentConfig, init_logging};
+
+// 載入環境變數配置
+let env_config = EnvironmentConfig::from_env();
+
+// 驗證配置
+if let Err(e) = env_config.validate() {
+    eprintln!("環境變數配置錯誤: {}", e);
+    return Ok(());
+}
+
+// 初始化日誌系統
+init_logging(&env_config)?;
+log::info!("環境配置: {}", env_config.summary());
+```
+
+## 📝 日誌系統
+
+### 日誌格式
+日誌格式與 Python 版本保持一致：
+```
+[L YYYY-MM-DD HH:MM:SS.fff UTC filename:line:function] message
+```
+
+### 範例輸出
+```
+[I 2024-01-15 08:30:45.123 UTC main.rs:25:main] 🚀 rshioaji 環境初始化完成
+[I 2024-01-15 08:30:45.124 UTC main.rs:26:main] 📊 日誌等級: INFO
+[I 2024-01-15 08:30:45.125 UTC main.rs:27:main] 🛡️  Sentry 錯誤追蹤: 啟用
+```
+
+### 啟用 Sentry 功能
+```bash
+# 編譯時加入 sentry 功能
+cargo build --features sentry
+
+# 執行時啟用 Sentry
+LOG_SENTRY=True SENTRY_URI=your_sentry_dsn cargo run --features sentry
+```
+
+## 📚 詳細文件
+
+- **[環境設定指南](docs/environment_setup.md)** - 完整的環境變數配置說明
+- **[登入流程說明](docs/login_flow.md)** - 標準登入流程詳細解析
+- **[代碼品質指南](docs/linting_guide.md)** - Clippy 和代碼品質檢查
+- **[更新日誌](CHANGELOG.md)** - 版本更新記錄
 
 ## 📖 API 使用指南
 

@@ -53,9 +53,9 @@ impl PythonBindings {
             log::info!("Successfully loaded shioaji for platform: {}", platform_dir);
             
             Ok(Self {
-                _py: unsafe { std::mem::transmute(py) },
+                _py: unsafe { std::mem::transmute::<pyo3::Python<'_>, pyo3::Python<'_>>(py) },
                 shioaji_module: shioaji_module.into(),
-                _solace_api: solace_api.into(),
+                _solace_api: solace_api,
                 _platform: platform,
             })
         })

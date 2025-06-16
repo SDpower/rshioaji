@@ -1,9 +1,7 @@
 use clap::Parser;
-use env_logger;
 use log::info;
 use rshioaji::{Shioaji, Exchange, Action, OrderType, StockPriceType, Config};
 use std::collections::HashMap;
-use tokio;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
