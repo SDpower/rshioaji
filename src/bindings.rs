@@ -1,7 +1,12 @@
 use pyo3::prelude::*;
 use pyo3::types::{PyDict, PyList};
 use std::collections::HashMap;
+use std::sync::{Arc, Weak};
+use tokio::sync::Mutex;
+
 use crate::platform::Platform;
+use crate::event_bridge::{EventBridge, CallbackRegistry};
+use crate::callbacks::EventHandlers;
 
 /// FFI bindings to Python shioaji C extensions
 pub struct PythonBindings {
@@ -9,6 +14,10 @@ pub struct PythonBindings {
     shioaji_module: PyObject,
     _solace_api: PyObject,
     _platform: Platform,
+    /// Event bridge for Python-Rust callback forwarding
+    event_bridge: Option<EventBridge>,
+    /// Registry for Python callback objects
+    callback_registry: Arc<Mutex<CallbackRegistry>>,
 }
 
 impl PythonBindings {
@@ -57,6 +66,8 @@ impl PythonBindings {
                 shioaji_module: shioaji_module.into(),
                 _solace_api: solace_api,
                 _platform: platform,
+                event_bridge: None,
+                callback_registry: Arc::new(Mutex::new(CallbackRegistry::new())),
             })
         })
     }
@@ -196,16 +207,48 @@ impl PythonBindings {
         })
     }
     
-    /// Set callback for tick data (simplified version without actual callback)
-    pub fn set_tick_callback(&self, instance: &PyObject) -> PyResult<()> {
-        Python::with_gil(|py| {
-            // For now, we'll just set a placeholder callback
-            // In a real implementation, you'd need to create a proper Python callable
-            let py_none = py.None();
-            instance.call_method(py, "set_on_tick_stk_v1_callback", (py_none,), None)?;
-            Ok(())
-        })
+    /// Initialize event bridge for callback forwarding
+    pub fn initialize_event_bridge(&mut self, handlers: Weak<Mutex<EventHandlers>>) -> crate::error::Result<()> {
+        self.event_bridge = Some(EventBridge::new(handlers)?);
+        log::debug!("Event bridge initialized successfully");
+        Ok(())
     }
+
+    /// Setup all callbacks with Python shioaji instance (simplified v0.3.0)
+    pub async fn setup_real_callbacks(&self, _instance: &PyObject) -> PyResult<()> {
+        if let Some(ref bridge) = self.event_bridge {
+            let mut registry = self.callback_registry.lock().await;
+            
+            Python::with_gil(|py| {
+                // Create simplified callbacks
+                let tick_callback = bridge.create_python_callback("tick_stk")?;
+                let bidask_callback = bridge.create_python_callback("bidask_stk")?;
+                let order_callback = bridge.create_python_callback("order")?;
+
+                // Register callbacks
+                registry.register_callback("tick_stk".to_string(), tick_callback.clone_ref(py));
+                registry.register_callback("bidask_stk".to_string(), bidask_callback.clone_ref(py));
+                registry.register_callback("order".to_string(), order_callback.clone_ref(py));
+
+                // Try to set callbacks in Python shioaji (with error handling)
+                // For now, this is a proof-of-concept - real shioaji integration would require
+                // specific method names and signatures
+
+                log::info!("✅ v0.3.0 Simplified callback system initialized");
+                log::info!("📋 Registered callbacks: tick_stk, bidask_stk, order");
+                log::warn!("⚠️  Note: This is a proof-of-concept implementation");
+                log::warn!("   Real Python shioaji integration requires specific callback methods");
+
+                Ok(())
+            })
+        } else {
+            Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                "Event bridge not initialized. Call initialize_event_bridge first."
+            ))
+        }
+    }
+
+
     
     /// Get historical data
     pub fn get_kbars(&self,

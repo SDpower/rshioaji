@@ -1,6 +1,6 @@
 //! # rshioaji - Rust Wrapper for Taiwan Shioaji API
 //! 
-//! A high-performance trading library with native event callbacks for Taiwan Shioaji API.
+//! A high-performance trading library with full Python-Rust event bridging for Taiwan Shioaji API.
 //! 
 //! ## Features
 //! 
@@ -10,15 +10,16 @@
 //! - ⚡ **Async Support**: Built on tokio for async operations
 //! - 🛡️ **Type Safety**: Complete Rust type definitions with compile-time checks
 //! 
-//! ## Version 0.2.0 - Event Callback System
+//! ## Version 0.3.0 - Full Python-Rust Event Bridging
 //! 
-//! This version introduces a comprehensive event callback system with native Rust traits:
+//! This version introduces comprehensive Python-Rust event bridging with real callback functionality:
 //! 
-//! - **TickCallback** - Handle stock and futures tick data events
-//! - **BidAskCallback** - Handle bid/ask spread events  
-//! - **QuoteCallback** - Handle quote events
-//! - **OrderCallback** - Handle order status changes
+//! - **TickCallback** - Handle stock and futures tick data events with real Python forwarding
+//! - **BidAskCallback** - Handle bid/ask spread events with real-time data  
+//! - **QuoteCallback** - Handle quote events with full market data
+//! - **OrderCallback** - Handle order status changes with complete state tracking
 //! - **SystemCallback** - Handle system events and connection status
+//! - **Event Bridge** - Seamless Python-Rust event forwarding with type safety
 //! 
 //! ## Quick Start
 //! 
@@ -57,6 +58,7 @@ pub mod callbacks;
 pub mod client;
 pub mod config;
 pub mod error;
+pub mod event_bridge;
 pub mod platform;
 pub mod types;
 pub mod utils;

@@ -10,7 +10,7 @@ use crate::types::*;
 
 /// Rust wrapper around the Python shioaji client
 pub struct Shioaji {
-    bindings: Arc<PythonBindings>,
+    bindings: Arc<Mutex<PythonBindings>>,
     instance: Arc<Mutex<std::option::Option<PyObject>>>,
     simulation: bool,
     proxies: HashMap<String, String>,
@@ -22,7 +22,7 @@ pub struct Shioaji {
 impl Shioaji {
     /// Create a new Shioaji client
     pub fn new(simulation: bool, proxies: HashMap<String, String>) -> Result<Self> {
-        let bindings = Arc::new(PythonBindings::new()?);
+        let bindings = Arc::new(Mutex::new(PythonBindings::new()?));
         
         Ok(Self {
             bindings,
@@ -37,7 +37,10 @@ impl Shioaji {
     
     /// Initialize the Python shioaji instance
     pub async fn init(&self) -> Result<()> {
-        let py_instance = self.bindings.create_shioaji(self.simulation, self.proxies.clone())?;
+        let bindings = self.bindings.lock().await;
+        let py_instance = bindings.create_shioaji(self.simulation, self.proxies.clone())?;
+        drop(bindings); // Release the lock early
+        
         let mut instance = self.instance.lock().await;
         *instance = Some(py_instance);
         Ok(())
@@ -58,7 +61,10 @@ impl Shioaji {
         // 步驟 1: 調用 Python shioaji 的 login 方法
         // 這會內部處理 token_login 或 simulation_login 的邏輯
         log::info!("🔑 開始登入流程 - 調用 token_login/simulation_login");
-        let _result = self.bindings.login(py_instance, api_key, secret_key, fetch_contract)?;
+        let _result = {
+            let bindings = self.bindings.lock().await;
+            bindings.login(py_instance, api_key, secret_key, fetch_contract)?
+        };
         
         // 步驟 2: 獲取帳戶資訊
         log::info!("📋 獲取帳戶清單...");
@@ -227,7 +233,10 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let result = self.bindings.logout(py_instance)?;
+        let result = {
+            let bindings = self.bindings.lock().await;
+            bindings.logout(py_instance)?
+        };
         
         Python::with_gil(|py| {
             let success: bool = result.extract(py)?;
@@ -240,7 +249,10 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let result = self.bindings.activate_ca(py_instance, ca_path, ca_passwd, person_id)?;
+        let result = {
+            let bindings = self.bindings.lock().await;
+            bindings.activate_ca(py_instance, ca_path, ca_passwd, person_id)?
+        };
         
         Python::with_gil(|py| {
             let success: bool = result.extract(py)?;
@@ -253,7 +265,10 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let result = self.bindings.list_accounts(py_instance)?;
+        let result = {
+            let bindings = self.bindings.lock().await;
+            bindings.list_accounts(py_instance)?
+        };
         
         Python::with_gil(|py| {
             let accounts_list = result.downcast::<pyo3::types::PyList>(py)?;
@@ -287,23 +302,28 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        // Convert Rust contract to Python object
-        let py_contract = self.bindings.create_contract(
-            &contract.base.security_type.to_string(),
-            &contract.base.code,
-            &contract.base.exchange.to_string(),
-        )?;
-        
-        // Convert Rust order to Python object
-        let py_order = self.bindings.create_order(
-            &order.action.to_string(),
-            order.price,
-            order.quantity,
-            &order.order_type.to_string(),
-            &order.price_type.to_string(),
-        )?;
-        
-        let result = self.bindings.place_order(py_instance, &py_contract, &py_order)?;
+        let (py_contract, py_order, result) = {
+            let bindings = self.bindings.lock().await;
+            
+            // Convert Rust contract to Python object
+            let py_contract = bindings.create_contract(
+                &contract.base.security_type.to_string(),
+                &contract.base.code,
+                &contract.base.exchange.to_string(),
+            )?;
+            
+            // Convert Rust order to Python object
+            let py_order = bindings.create_order(
+                &order.action.to_string(),
+                order.price,
+                order.quantity,
+                &order.order_type.to_string(),
+                &order.price_type.to_string(),
+            )?;
+            
+            let result = bindings.place_order(py_instance, &py_contract, &py_order)?;
+            (py_contract, py_order, result)
+        };
         
         Python::with_gil(|py| {
             let trade_dict = result.downcast::<pyo3::types::PyDict>(py)?;
@@ -353,19 +373,23 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let py_contract = self.bindings.create_contract(
-            &contract.base.security_type.to_string(),
-            &contract.base.code,
-            &contract.base.exchange.to_string(),
-        )?;
-        
         let quote_type_str = match quote_type {
             QuoteType::Tick => "tick",
             QuoteType::BidAsk => "bidask",
             QuoteType::Quote => "quote",
         };
         
-        self.bindings.subscribe(py_instance, &py_contract, quote_type_str)?;
+        {
+            let bindings = self.bindings.lock().await;
+            let py_contract = bindings.create_contract(
+                &contract.base.security_type.to_string(),
+                &contract.base.code,
+                &contract.base.exchange.to_string(),
+            )?;
+            
+            bindings.subscribe(py_instance, &py_contract, quote_type_str)?;
+        }
+        
         Ok(())
     }
     
@@ -374,13 +398,16 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let py_contract = self.bindings.create_contract(
-            &contract.base.security_type.to_string(),
-            &contract.base.code,
-            &contract.base.exchange.to_string(),
-        )?;
-        
-        let result = self.bindings.get_kbars(py_instance, &py_contract, start, end)?;
+        let result = {
+            let bindings = self.bindings.lock().await;
+            let py_contract = bindings.create_contract(
+                &contract.base.security_type.to_string(),
+                &contract.base.code,
+                &contract.base.exchange.to_string(),
+            )?;
+            
+            bindings.get_kbars(py_instance, &py_contract, start, end)?
+        };
         
         Python::with_gil(|py| {
             let kbars_dict = result.downcast::<pyo3::types::PyDict>(py)?;
@@ -456,13 +483,16 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let py_contract = self.bindings.create_contract(
-            &contract.base.security_type.to_string(),
-            &contract.base.code,
-            &contract.base.exchange.to_string(),
-        )?;
-        
-        let result = self.bindings.get_ticks(py_instance, &py_contract, date)?;
+        let result = {
+            let bindings = self.bindings.lock().await;
+            let py_contract = bindings.create_contract(
+                &contract.base.security_type.to_string(),
+                &contract.base.code,
+                &contract.base.exchange.to_string(),
+            )?;
+            
+            bindings.get_ticks(py_instance, &py_contract, date)?
+        };
         
         Python::with_gil(|py| {
             let ticks_dict = result.downcast::<pyo3::types::PyDict>(py)?;
@@ -598,18 +628,38 @@ impl Shioaji {
         handlers.register_system_callback(callback);
     }
     
-    /// Setup Python callbacks to forward events to Rust handlers
+    /// Setup callback system with real Python-Rust bridging (v0.3.0)
+    /// 
+    /// This method initializes the full Python-Rust event bridge, allowing
+    /// real market data events from Python shioaji to trigger registered Rust callbacks.
     pub async fn setup_callbacks(&self) -> Result<()> {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        // For now, we'll setup placeholder callbacks
-        // In a complete implementation, these would create Python callables that forward to Rust
-        self.bindings.set_tick_callback(py_instance)?;
+        // Initialize event bridge with weak reference to handlers
+        let handlers_weak = Arc::downgrade(&self.event_handlers);
+        {
+            let mut bindings = self.bindings.lock().await;
+            bindings.initialize_event_bridge(handlers_weak)?;
+            
+            // Setup real callbacks with Python shioaji
+            bindings.setup_real_callbacks(py_instance).await?;
+        }
         
-        log::info!("Event callbacks setup completed");
+        // Validate that event handlers are properly initialized
+        let handlers = self.event_handlers.lock().await;
+        log::info!("✅ Event callback system initialized with Python-Rust bridging (v0.3.0)");
+        log::info!("📊 Registered handlers: tick={}, bidask={}, quote={}, order={}, system={}", 
+                   handlers.tick_callbacks.len(),
+                   handlers.bidask_callbacks.len(), 
+                   handlers.quote_callbacks.len(),
+                   handlers.order_callbacks.len(),
+                   handlers.system_callbacks.len());
+        
         Ok(())
     }
+
+
 }
 
 // Convenience functions for creating contracts
