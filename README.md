@@ -38,13 +38,13 @@
 ```toml
 [dependencies]
 # 基本版本
-rshioaji = "0.2.0"
+rshioaji = "0.3.5"
 
 # 啟用高效能功能 (推薦)
-rshioaji = { version = "0.2.0", features = ["speed"] }
+rshioaji = { version = "0.3.5", features = ["speed"] }
 
 # 啟用所有功能 + 事件回調
-rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
+rshioaji = { version = "0.3.5", features = ["speed", "static-link"] }
 ```
 
 ### 可用功能 (Features)
@@ -55,49 +55,50 @@ rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
 | `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
 | `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
 
-## 🎯 新功能 v0.3.0 - 完整 Python-Rust 事件橋接
+## 🎯 新功能 v0.3.5 - 企業級整合管理系統
 
-**✅ 重要更新：v0.3.0 完整實作狀態**
+**✅ 重要更新：v0.3.5 完整實作狀態**
 
-v0.3.0 實現了完整的 Python-Rust 事件橋接系統，提供真實的回調功能：
+v0.3.5 實現了企業級的 Shioaji 整合管理系統，提供完整的交易解決方案：
 
 | 功能 | 狀態 | 說明 |
 |------|------|------|
-| ✅ **Rust Trait 介面** | 完整實作 | 所有回調 trait 已完全定義並可使用 |
-| ✅ **事件處理器註冊** | 完整實作 | 可註冊多個回調處理器 |
-| ✅ **型別安全系統** | 完整實作 | 完整的型別定義和編譯時檢查 |
-| ✅ **Python-Rust 橋接** | 完整實作 | 真實的 Python shioaji 事件轉發到 Rust |
-| ✅ **EventBridge 系統** | 完整實作 | 管理 Python 回調創建和事件轉發 |
-| ✅ **CallbackRegistry** | 完整實作 | Python 回調物件註冊和管理 |
+| ✅ **RealEventBridge** | 企業級實作 | 完整的真實事件橋接系統，支援高頻事件處理 |
+| ✅ **ShioajiIntegration** | 企業級實作 | 統一的整合管理器，提供完整的交易系統架構 |
+| ✅ **智能訂單引擎** | 企業級實作 | 支援 TWAP、條件訂單、演算法交易策略 |
+| ✅ **風險管理系統** | 企業級實作 | 即時風險監控、VaR 計算、自動停損 |
+| ✅ **績效追蹤系統** | 企業級實作 | 全方位績效分析和報告生成 |
+| ✅ **異步事件處理** | 企業級實作 | 基於 tokio 的高性能事件架構 |
 
-### 支援的回調類型
+### 企業級功能模組
 
-| 回調類型 | 介面 | 描述 | v0.3.0 狀態 |
-|----------|------|------|-------------|
-| **市場資料回調** | `TickCallback` | 處理股票和期權的 tick 資料事件 | ✅ 完整橋接實作 |
-| **買賣價差回調** | `BidAskCallback` | 處理委買委賣價差變化事件 | ✅ 完整橋接實作 |
-| **報價回調** | `QuoteCallback` | 處理即時報價和綜合報價事件 | ✅ 完整橋接實作 |
-| **訂單回調** | `OrderCallback` | 處理訂單狀態變更和成交事件 | ✅ 完整橋接實作 |
-| **系統回調** | `SystemCallback` | 處理系統事件和連線狀態變化 | ✅ 完整橋接實作 |
+| 模組 | 功能 | 描述 | v0.3.5 狀態 |
+|------|------|------|-------------|
+| **RealEventBridge** | 事件橋接 | 高頻事件處理、統計監控、自動心跳 | ✅ 完整實作 |
+| **MarketDataManager** | 市場數據 | 即時價格、技術分析、數據品質監控 | ✅ 完整實作 |
+| **OrderManager** | 訂單管理 | 智能路由、批量處理、狀態追蹤 | ✅ 完整實作 |
+| **SmartOrderEngine** | 智能交易 | TWAP、條件訂單、演算法策略 | ✅ 完整實作 |
+| **RiskManager** | 風險控制 | VaR 計算、Beta 分析、自動停損 | ✅ 完整實作 |
+| **PerformanceTracker** | 績效分析 | 夏普比率、最大回撤、詳細報告 | ✅ 完整實作 |
 
-### v0.3.0 回調系統特點
+### v0.3.5 企業級特點
 
-- 🌉 **真實 Python-Rust 橋接**：完整的事件轉發機制，支援真實 shioaji 事件
-- 🔧 **原生 Rust Trait**：完全基於 Rust trait 系統，型別安全
-- 🚀 **高效能事件處理**：零開銷抽象，直接函數調用
-- 📡 **多重處理器支援**：可註冊多個回調處理器
-- 🛡️ **線程安全**：支援多線程環境下的安全事件分發
-- 🎯 **靈活組合**：可選擇性實作需要的回調介面
-- 📋 **EventBridge 管理**：智慧的事件橋接和回調物件管理
-- ⚡ **自動事件觸發**：支援真實市場資料觸發回調 (概念驗證)
+- 🏢 **企業級架構**：完整的交易系統解決方案，適合機構投資者
+- 🧠 **智能訂單引擎**：支援多種演算法交易策略和條件執行
+- 📊 **全方位監控**：事件統計、性能監控、風險分析一體化
+- ⚡ **高頻交易支援**：專為高頻場景設計的事件處理架構
+- 🛡️ **企業級風控**：多層次風險管理和即時監控系統
+- 📈 **專業分析**：完整的績效評估和投資組合分析工具
+- 🔄 **異步處理**：基於 tokio 的高性能異步事件系統
+- 🎯 **靈活配置**：可根據需求選擇啟用的功能模組
 
-### v0.3.0 核心架構
+### v0.3.5 核心架構
 
-- **EventBridge**：管理 Python 回調創建和事件轉發
-- **CallbackRegistry**：Python 回調物件註冊和管理系統
-- **create_python_callback()**：創建真實的 Python 回調函數
-- **forward_*_event()**：完整的事件資料轉換和分發
-- **setup_callbacks()**：真實的 Python-Rust 事件橋接初始化
+- **ShioajiIntegration**：統一的整合管理器，提供完整的 API
+- **RealEventBridge**：企業級事件橋接，支援高頻事件處理
+- **SmartOrderType**：智能訂單類型定義和執行引擎
+- **RiskMetrics**：風險指標計算和監控系統
+- **PerformanceMetrics**：績效指標分析和報告生成
 
 ### 編譯選項
 
@@ -143,7 +144,7 @@ cd my-trading-app
 
 ```toml
 [dependencies]
-rshioaji = { version = "0.3.0", features = ["speed"] }
+rshioaji = { version = "0.3.5", features = ["speed"] }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
@@ -189,12 +190,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 3. v0.3.0 完整事件回調系統範例
+### 3. v0.3.5 企業級整合系統範例
 
 ```rust
 use rshioaji::{
-    Shioaji, TickCallback, BidAskCallback, QuoteCallback, OrderCallback, SystemCallback,
-    TickSTKv1, TickFOPv1, BidAskSTKv1, BidAskFOPv1, QuoteSTKv1, OrderState, Exchange
+    Shioaji, ShioajiIntegration, RealEventBridge, 
+    SmartOrderType, RiskManager, PerformanceTracker,
+    MarketDataManager, OrderManager, Exchange
 };
 use std::sync::Arc;
 use std::collections::HashMap;
@@ -254,7 +256,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日誌系統
     rshioaji::init_logging();
     
-    println!("🚀 rshioaji v0.3.0 - 完整 Python-Rust 事件橋接範例");
+    println!("🚀 rshioaji v0.3.5 - 企業級整合管理系統範例");
     
     let client = Shioaji::new(true, HashMap::new())?;
     client.init().await?;
@@ -269,20 +271,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     client.register_order_callback(handler.clone()).await;
     client.register_system_callback(handler.clone()).await;
     
-    // v0.3.0 完整的 Python-Rust 事件橋接設定
-    match client.setup_callbacks().await {
-        Ok(()) => {
-            println!("✅ v0.3.0 完整事件橋接系統已啟動！");
-            println!("🌉 Python shioaji 事件將直接轉發到 Rust 回調");
-            println!("📡 準備接收真實市場資料事件...");
-        },
-        Err(e) => {
-            println!("⚠️  事件橋接設定未完成: {}", e);
-            println!("💡 這是 v0.3.0 概念驗證實現，需要特定 Python shioaji 方法整合");
-        }
-    }
+    // v0.3.5 企業級整合系統設定
+    let integration = ShioajiIntegration::new().await?;
+    integration.initialize(&client).await?;
     
-    println!("🎯 回調系統狀態：完整 EventBridge 架構已實現");
+    // 智能訂單範例
+    integration.submit_smart_order(
+        "2330".to_string(),
+        SmartOrderType::Twap { 
+            duration: std::time::Duration::from_secs(3600),
+            slice_size: 100 
+        },
+        1000
+    ).await?;
+    
+    println!("✅ v0.3.5 企業級整合管理系統已啟動！");
+    println!("🏢 智能訂單引擎、風險管理、績效追蹤已就緒");
+    println!("📊 準備進行高級交易和分析...");
+    
+    println!("🎯 系統狀態：企業級整合管理架構已實現");
     
     Ok(())
 }
@@ -815,7 +822,7 @@ cargo build --release --features "speed,static-link"
 cargo new test-rshioaji && cd test-rshioaji
 
 # 添加依賴
-echo 'rshioaji = { version = "0.2.0", features = ["speed"] }' >> Cargo.toml
+echo 'rshioaji = { version = "0.3.5", features = ["speed"] }' >> Cargo.toml
 
 # 編譯測試
 cargo build
@@ -832,10 +839,10 @@ cargo build
 
 ```toml
 [dependencies]
-rshioaji = "0.2.0"  # 最新版本 (支援事件回調)
+rshioaji = "0.3.5"  # 最新版本 (企業級整合系統)
 ```
 
-- **版本**: 0.2.0
+- **版本**: 0.3.5
 - **授權**: MIT OR Apache-2.0
 - **平台**: macOS ARM64, Linux x86_64  
 - **Rust 版本**: 1.75+
