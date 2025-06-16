@@ -27,6 +27,7 @@
 - 📝 **日誌系統**：與 Python 版本相同格式的日誌系統
 - 🔍 **錯誤追蹤**：支援 Sentry 整合和錯誤監控
 - 🔑 **完整登入流程**：實現與 Python 版本相同的標準登入步驟
+- 📡 **事件回調系統**：原生 Rust trait 系統，支援市場資料、訂單和系統事件回調
 
 ## 📦 安裝
 
@@ -37,13 +38,13 @@
 ```toml
 [dependencies]
 # 基本版本
-rshioaji = "0.1.0"
+rshioaji = "0.2.0"
 
 # 啟用高效能功能 (推薦)
-rshioaji = { version = "0.1.0", features = ["speed"] }
+rshioaji = { version = "0.2.0", features = ["speed"] }
 
-# 啟用所有功能
-rshioaji = { version = "0.1.0", features = ["speed", "static-link"] }
+# 啟用所有功能 + 事件回調
+rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
 ```
 
 ### 可用功能 (Features)
@@ -53,6 +54,26 @@ rshioaji = { version = "0.1.0", features = ["speed", "static-link"] }
 | `speed` | 🚀 高效能時間處理 | 等效於 Python `shioaji[speed]`，提升日期時間處理效能 |
 | `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
 | `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
+
+## 🎯 新功能 v0.2.0 - 事件回調系統
+
+### 支援的回調類型
+
+| 回調類型 | 介面 | 描述 |
+|----------|------|------|
+| **市場資料回調** | `TickCallback` | 處理股票和期權的 tick 資料事件 |
+| **買賣價差回調** | `BidAskCallback` | 處理委買委賣價差變化事件 |
+| **報價回調** | `QuoteCallback` | 處理即時報價和綜合報價事件 |
+| **訂單回調** | `OrderCallback` | 處理訂單狀態變更和成交事件 |
+| **系統回調** | `SystemCallback` | 處理系統事件和連線狀態變化 |
+
+### 回調系統特點
+
+- 🔧 **原生 Rust Trait**：完全基於 Rust trait 系統，型別安全
+- 🚀 **高效能事件處理**：零開銷抽象，直接函數調用
+- 📡 **多重處理器支援**：可註冊多個回調處理器
+- 🛡️ **線程安全**：支援多線程環境下的安全事件分發
+- 🎯 **靈活組合**：可選擇性實作需要的回調介面
 
 ### 編譯選項
 
@@ -98,7 +119,7 @@ cd my-trading-app
 
 ```toml
 [dependencies]
-rshioaji = { version = "0.1.0", features = ["speed"] }
+rshioaji = { version = "0.2.0", features = ["speed"] }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
@@ -139,6 +160,71 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 取得歷史資料
     let kbars = client.kbars(stock.contract, "2024-01-01", "2024-01-31").await?;
     log::info!("取得 {} 筆 K 線資料", kbars.data.len());
+    
+    Ok(())
+}
+```
+
+### 3. 事件回調系統範例 (新功能)
+
+```rust
+use rshioaji::{
+    Shioaji, TickCallback, BidAskCallback, QuoteCallback, OrderCallback, SystemCallback,
+    TickSTKv1, TickFOPv1, BidAskSTKv1, BidAskFOPv1, QuoteSTKv1, OrderState, Exchange
+};
+use std::sync::Arc;
+
+// 實作事件處理器
+#[derive(Debug)]
+struct MyEventHandler {
+    name: String,
+}
+
+impl TickCallback for MyEventHandler {
+    fn on_tick_stk_v1(&self, exchange: Exchange, tick: TickSTKv1) {
+        println!("📈 [{}] 股票 Tick: {} @ {:?} - 價格: {}", 
+                self.name, tick.code, exchange, tick.close);
+    }
+    
+    fn on_tick_fop_v1(&self, exchange: Exchange, tick: TickFOPv1) {
+        println!("📊 [{}] 期權 Tick: {} @ {:?} - 價格: {}", 
+                self.name, tick.code, exchange, tick.close);
+    }
+}
+
+impl OrderCallback for MyEventHandler {
+    fn on_order(&self, order_state: OrderState, data: serde_json::Value) {
+        println!("📋 [{}] 訂單更新: {:?}", self.name, order_state);
+    }
+}
+
+impl SystemCallback for MyEventHandler {
+    fn on_event(&self, event_type: i32, code: i32, message: String, details: String) {
+        println!("🔔 [{}] 系統事件: {}", self.name, message);
+    }
+    
+    fn on_session_down(&self) {
+        println!("⚠️ [{}] 連線中斷！", self.name);
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Shioaji::new(true, HashMap::new())?;
+    client.init().await?;
+    
+    // 建立事件處理器
+    let handler = Arc::new(MyEventHandler { name: "主處理器".to_string() });
+    
+    // 註冊各種回調
+    client.register_tick_callback(handler.clone()).await;
+    client.register_order_callback(handler.clone()).await;
+    client.register_system_callback(handler.clone()).await;
+    
+    // 設定回調系統
+    client.setup_callbacks().await?;
+    
+    println!("✅ 事件回調系統已啟動");
     
     Ok(())
 }
@@ -671,7 +757,7 @@ cargo build --release --features "speed,static-link"
 cargo new test-rshioaji && cd test-rshioaji
 
 # 添加依賴
-echo 'rshioaji = { version = "0.1.0", features = ["speed"] }' >> Cargo.toml
+echo 'rshioaji = { version = "0.2.0", features = ["speed"] }' >> Cargo.toml
 
 # 編譯測試
 cargo build
@@ -688,10 +774,10 @@ cargo build
 
 ```toml
 [dependencies]
-rshioaji = "0.1.0"  # 最新版本
+rshioaji = "0.2.0"  # 最新版本 (支援事件回調)
 ```
 
-- **版本**: 0.1.0
+- **版本**: 0.2.0
 - **授權**: MIT OR Apache-2.0
 - **平台**: macOS ARM64, Linux x86_64  
 - **Rust 版本**: 1.75+

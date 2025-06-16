@@ -4,6 +4,7 @@ use tokio::sync::Mutex;
 use pyo3::prelude::*;
 
 use crate::bindings::PythonBindings;
+use crate::callbacks::EventHandlers;
 use crate::error::{Error, Result};
 use crate::types::*;
 
@@ -15,6 +16,7 @@ pub struct Shioaji {
     proxies: HashMap<String, String>,
     stock_account: Arc<Mutex<std::option::Option<StockAccount>>>,
     future_account: Arc<Mutex<std::option::Option<FutureAccount>>>,
+    event_handlers: Arc<Mutex<EventHandlers>>,
 }
 
 impl Shioaji {
@@ -29,6 +31,7 @@ impl Shioaji {
             proxies,
             stock_account: Arc::new(Mutex::new(None)),
             future_account: Arc::new(Mutex::new(None)),
+            event_handlers: Arc::new(Mutex::new(EventHandlers::new())),
         })
     }
     
@@ -563,6 +566,49 @@ impl Shioaji {
     pub async fn get_default_future_account(&self) -> std::option::Option<FutureAccount> {
         let future_account = self.future_account.lock().await;
         future_account.clone()
+    }
+    
+    /// Register a tick callback handler
+    pub async fn register_tick_callback(&self, callback: Arc<dyn crate::callbacks::TickCallback>) {
+        let mut handlers = self.event_handlers.lock().await;
+        handlers.register_tick_callback(callback);
+    }
+    
+    /// Register a bid/ask callback handler
+    pub async fn register_bidask_callback(&self, callback: Arc<dyn crate::callbacks::BidAskCallback>) {
+        let mut handlers = self.event_handlers.lock().await;
+        handlers.register_bidask_callback(callback);
+    }
+    
+    /// Register a quote callback handler
+    pub async fn register_quote_callback(&self, callback: Arc<dyn crate::callbacks::QuoteCallback>) {
+        let mut handlers = self.event_handlers.lock().await;
+        handlers.register_quote_callback(callback);
+    }
+    
+    /// Register an order callback handler
+    pub async fn register_order_callback(&self, callback: Arc<dyn crate::callbacks::OrderCallback>) {
+        let mut handlers = self.event_handlers.lock().await;
+        handlers.register_order_callback(callback);
+    }
+    
+    /// Register a system callback handler
+    pub async fn register_system_callback(&self, callback: Arc<dyn crate::callbacks::SystemCallback>) {
+        let mut handlers = self.event_handlers.lock().await;
+        handlers.register_system_callback(callback);
+    }
+    
+    /// Setup Python callbacks to forward events to Rust handlers
+    pub async fn setup_callbacks(&self) -> Result<()> {
+        let instance = self.instance.lock().await;
+        let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
+        
+        // For now, we'll setup placeholder callbacks
+        // In a complete implementation, these would create Python callables that forward to Rust
+        self.bindings.set_tick_callback(py_instance)?;
+        
+        log::info!("Event callbacks setup completed");
+        Ok(())
     }
 }
 

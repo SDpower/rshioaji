@@ -2,6 +2,86 @@
 
 本文件記錄 rshioaji 專案的重要變更。
 
+## [v0.2.0] - 2024-06-16
+
+### 🚀 新功能 (Added)
+
+#### 事件回調系統
+- **原生 Rust 回調支援**：新增完整的事件回調系統，提供用戶端原生 Rust trait 介面
+- **TickCallback Trait**：處理股票和期權 tick 資料事件回調
+  - `on_tick_stk_v1()` - 股票 tick 事件
+  - `on_tick_fop_v1()` - 期權 tick 事件
+- **BidAskCallback Trait**：處理買賣價差事件回調
+  - `on_bidask_stk_v1()` - 股票委買委賣事件
+  - `on_bidask_fop_v1()` - 期權委買委賣事件
+- **QuoteCallback Trait**：處理報價事件回調
+  - `on_quote_stk_v1()` - 股票報價事件
+  - `on_quote()` - 一般報價事件
+- **OrderCallback Trait**：處理訂單狀態變更回調
+  - `on_order()` - 訂單狀態變更事件
+- **SystemCallback Trait**：處理系統事件回調
+  - `on_event()` - 系統事件
+  - `on_session_down()` - 連線中斷事件
+
+#### 回調系統管理
+- **EventHandlers**：事件處理器註冊管理系統
+- **多重處理器支援**：允許註冊多個回調處理器
+- **線程安全設計**：支援多線程環境下的安全事件分發
+
+#### 客戶端整合
+- 在 `Shioaji` 客戶端新增回調註冊方法：
+  - `register_tick_callback()`
+  - `register_bidask_callback()`
+  - `register_quote_callback()`
+  - `register_order_callback()`
+  - `register_system_callback()`
+- `setup_callbacks()` - 初始化回調系統
+
+#### 型別定義擴充
+- 新增 `OrderState` 枚舉，支援各種訂單狀態
+- 修正型別命名衝突問題 (`OrderEventType` vs `OrderState`)
+
+#### 範例程式
+- 新增 `examples/callback_example.rs` 完整回調系統範例
+- 包含價格警示處理器實作範例
+- 展示多種回調 trait 的使用方式
+
+### 🔧 改進 (Changed)
+
+#### 專案配置
+- 更新版本號至 0.2.0
+- 更新套件描述，突出事件回調功能
+- 新增關鍵字：`callbacks`, `events`
+
+#### 文檔更新
+- 更新 README.md 新增事件回調系統說明
+- 新增回調系統特點和使用範例
+- 更新所有版本號引用至 0.2.0
+
+### 🐛 修正 (Fixed)
+
+#### 型別衝突
+- 修正 `OrderState` 名稱衝突問題
+- 將 `constants.rs` 中的 `OrderState` 重新命名為 `OrderEventType`
+- 修正編譯警告
+
+#### 模組匯出
+- 正確匯出回調相關型別和 trait
+- 修正模組可見性設定
+
+### 🏗️ 內部改動 (Internal)
+
+#### 程式碼結構
+- 新增 `src/callbacks.rs` 模組
+- 更新 `src/lib.rs` 匯出清單
+- 重構客戶端結構以支援事件處理器
+
+#### 依賴管理
+- 所有依賴版本保持不變
+- 無新增外部依賴
+
+---
+
 ## [v0.1.1] - 2024-01-15
 
 ### 🚀 新功能 (Added)

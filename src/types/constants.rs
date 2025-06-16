@@ -146,7 +146,7 @@ pub enum Status {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum OrderState {
+pub enum OrderEventType {
     StockDeal,   // 股票成交
     StockOrder,  // 股票委託
     FuturesOrder, // 期貨委託

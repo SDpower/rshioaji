@@ -157,3 +157,59 @@ pub struct ComboTrade {
     pub account: Account,
     pub combo_contract: crate::types::contracts::ComboContract,
 }
+
+/// Order state for callbacks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum OrderState {
+    /// Order has been submitted
+    Submitted,
+    /// Order is filled
+    Filled,
+    /// Order is partially filled
+    PartFilled,
+    /// Order is cancelled
+    Cancelled,
+    /// Order failed
+    Failed,
+    /// Order is pending submit
+    PendingSubmit,
+    /// Order is pending cancel
+    PendingCancel,
+    /// Order is waiting for manual approval
+    WaitingManualApproval,
+    /// Order is rejected
+    Rejected,
+}
+
+impl std::fmt::Display for OrderState {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OrderState::Submitted => write!(f, "Submitted"),
+            OrderState::Filled => write!(f, "Filled"),
+            OrderState::PartFilled => write!(f, "PartFilled"),
+            OrderState::Cancelled => write!(f, "Cancelled"),
+            OrderState::Failed => write!(f, "Failed"),
+            OrderState::PendingSubmit => write!(f, "PendingSubmit"),
+            OrderState::PendingCancel => write!(f, "PendingCancel"),
+            OrderState::WaitingManualApproval => write!(f, "WaitingManualApproval"),
+            OrderState::Rejected => write!(f, "Rejected"),
+        }
+    }
+}
+
+impl From<&str> for OrderState {
+    fn from(s: &str) -> Self {
+        match s {
+            "Submitted" => OrderState::Submitted,
+            "Filled" => OrderState::Filled,
+            "PartFilled" => OrderState::PartFilled,
+            "Cancelled" => OrderState::Cancelled,
+            "Failed" => OrderState::Failed,
+            "PendingSubmit" => OrderState::PendingSubmit,
+            "PendingCancel" => OrderState::PendingCancel,
+            "WaitingManualApproval" => OrderState::WaitingManualApproval,
+            "Rejected" => OrderState::Rejected,
+            _ => OrderState::Failed,
+        }
+    }
+}
