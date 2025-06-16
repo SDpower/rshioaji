@@ -1,6 +1,6 @@
 [package]
 name = "rshioaji"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Steve Lo <info@sd.idv.tw>"]
 edition = "2021"
 description = "Rust wrapper for Taiwan Shioaji API - A high-performance trading library"
