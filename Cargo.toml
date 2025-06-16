@@ -9,7 +9,7 @@ readme = "README.md"
 homepage = "https://github.com/stevelo/rshioaji"
 repository = "https://github.com/stevelo/rshioaji"
 documentation = "https://docs.rs/rshioaji"
-keywords = ["shioaji", "trading", "taiwan", "stock", "api", "callbacks", "events"]
+keywords = ["shioaji", "trading", "taiwan", "api", "callbacks"]
 categories = ["api-bindings", "finance"]
 exclude = [
     ".env*",
