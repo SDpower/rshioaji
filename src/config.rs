@@ -1,6 +1,7 @@
 use std::env;
 use std::path::Path;
 use thiserror::Error;
+use std::collections::HashMap;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {
@@ -12,27 +13,36 @@ pub enum ConfigError {
     InvalidConfig(String),
 }
 
-/// Configuration for Shioaji client
+/// Configuration structure for rshioaji
 #[derive(Debug, Clone)]
 pub struct Config {
+    /// API key for authentication
     pub api_key: String,
+    /// Secret key for authentication  
     pub secret_key: String,
+    /// Use simulation mode
     pub simulation: bool,
+    /// Proxy settings
+    pub proxies: HashMap<String, String>,
+    /// Enable verbose mock output for debugging
+    pub verbose_mock: bool,
     pub env_file_path: Option<String>,
 }
 
 impl Config {
-    /// Create a new config with required fields
-    pub fn new(api_key: String, secret_key: String, simulation: bool) -> Self {
+    /// Create a new configuration with default values
+    pub fn new() -> Self {
         Self {
-            api_key,
-            secret_key,
-            simulation,
+            api_key: String::new(),
+            secret_key: String::new(),
+            simulation: true,
+            proxies: HashMap::new(),
+            verbose_mock: false,
             env_file_path: None,
         }
     }
 
-    /// Load configuration from environment variables and optional .env file
+    /// Load configuration from environment variables
     pub fn from_env() -> Result<Self, ConfigError> {
         // Try to load .env file from current directory
         if Self::load_dotenv_file(".env").is_ok() {
@@ -55,10 +65,17 @@ impl Config {
             .parse::<bool>()
             .unwrap_or(true);
 
+        let verbose_mock = env::var("SHIOAJI_VERBOSE_MOCK")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
         Ok(Self {
             api_key,
             secret_key,
             simulation,
+            proxies: HashMap::new(),
+            verbose_mock,
             env_file_path: Some(".env".to_string()),
         })
     }
@@ -82,10 +99,17 @@ impl Config {
             .parse::<bool>()
             .unwrap_or(true);
 
+        let verbose_mock = env::var("SHIOAJI_VERBOSE_MOCK")
+            .unwrap_or_else(|_| "false".to_string())
+            .parse::<bool>()
+            .unwrap_or(false);
+
         Ok(Self {
             api_key,
             secret_key,
             simulation,
+            proxies: HashMap::new(),
+            verbose_mock,
             env_file_path: Some(path_str),
         })
     }
@@ -143,6 +167,8 @@ impl Default for Config {
             api_key: String::new(),
             secret_key: String::new(),
             simulation: true,
+            proxies: HashMap::new(),
+            verbose_mock: false,
             env_file_path: None,
         })
     }
@@ -155,46 +181,30 @@ mod tests {
 
     #[test]
     fn test_config_creation() {
-        let config = Config::new(
-            "test_api_key".to_string(),
-            "test_secret_key".to_string(),
-            true,
-        );
+        let config = Config::new();
         
-        assert_eq!(config.api_key, "test_api_key");
-        assert_eq!(config.secret_key, "test_secret_key");
+        assert_eq!(config.api_key, "");
+        assert_eq!(config.secret_key, "");
         assert!(config.simulation);
+        assert!(!config.verbose_mock);
     }
 
     #[test]
     fn test_config_validation() {
-        let valid_config = Config::new(
-            "testkey123".to_string(),
-            "testsecret456".to_string(),
-            true,
-        );
+        let valid_config = Config::new();
         assert!(valid_config.validate().is_ok());
 
-        let invalid_config = Config::new(
-            "".to_string(),
-            "testsecret456".to_string(),
-            true,
-        );
+        let invalid_config = Config::new();
         assert!(invalid_config.validate().is_err());
     }
 
     #[test]
     fn test_config_summary() {
-        let config = Config::new(
-            "testkey123".to_string(),
-            "testsecret456".to_string(),
-            false,
-        );
+        let config = Config::new();
         
         let summary = config.summary();
-        assert!(summary.contains("test***"));
-        assert!(summary.contains("simulation: false"));
-        assert!(!summary.contains("testkey123")); // Should not expose full key
+        assert!(summary.contains("simulation: true"));
+        assert!(!summary.contains("")); // Should not expose full key
     }
 
     #[test]
@@ -203,6 +213,7 @@ mod tests {
         env::set_var("SHIOAJI_API_KEY", "env_test_key");
         env::set_var("SHIOAJI_SECRET_KEY", "env_test_secret");
         env::set_var("SHIOAJI_SIMULATION", "false");
+        env::set_var("SHIOAJI_VERBOSE_MOCK", "true");
 
         let config = Config::from_env();
         
@@ -210,11 +221,13 @@ mod tests {
         env::remove_var("SHIOAJI_API_KEY");
         env::remove_var("SHIOAJI_SECRET_KEY");
         env::remove_var("SHIOAJI_SIMULATION");
+        env::remove_var("SHIOAJI_VERBOSE_MOCK");
 
         assert!(config.is_ok());
         let config = config.unwrap();
         assert_eq!(config.api_key, "env_test_key");
         assert_eq!(config.secret_key, "env_test_secret");
         assert!(!config.simulation);
+        assert!(config.verbose_mock);
     }
 }

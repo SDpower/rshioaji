@@ -428,4 +428,110 @@ client.setup_callbacks().await?;
 - 📚 文件
 - 🧪 測試
 - ⚠️ 破壞性變更
-- 🔒 安全性修正 
+- �� 安全性修正 
+
+## [0.4.2] - 2025-01-17
+
+### 🎯 主要改進 - 乾淨的使用體驗
+
+- ✅ **移除調試訊息**：完全清理 Mock 系統的 `print()` 語句，提供專業級執行環境
+- ✅ **修復事件觸發**：重構模擬數據生成機制，確保回調事件能正確觸發
+- ✅ **可選調試模式**：新增 `SHIOAJI_VERBOSE_MOCK` 環境變數，開發者可選擇顯示詳細調試訊息
+- ✅ **實際事件測試**：Rust 端直接觸發模擬事件，繞過複雜的 Python Mock 回調鏈
+- ✅ **乾淨範例程式**：新增 `clean_usage.rs` 展示理想的使用體驗
+- ✅ **優化配置系統**：增強 Config 結構體，支援更多配置選項
+
+### 🐛 修復的問題
+
+- 🔧 解決大量 Mock 調試訊息干擾用戶使用的問題
+- 🔧 修復模擬模式下回調事件不觸發的問題
+- 🔧 改善 Python Mock 系統與 Rust 事件橋接的連接問題
+
+### 📝 文件更新
+
+- 📚 更新 README.md 為 v0.4.2，重點介紹乾淨使用體驗
+- 📚 完善範例程式註釋和說明文件
+- 📚 清理過時的測試檔案
+
+### 🔄 Before vs After
+
+**Before (v0.4.1)**：
+```
+Mock: Simulating market data for contract=...
+Mock: Login called with api_key=...
+Mock: Subscribe called - contract=...
+[大量調試訊息但沒有實際事件]
+```
+
+**After (v0.4.2)**：
+```
+🚀 rshioaji v0.4.2 - 乾淨使用體驗示範
+✅ 客戶端初始化成功
+✅ 登入成功！找到 2 個模擬帳戶
+📊 收到股票 Tick: 2330 @ 525.5      ← 實際事件
+💰 收到股票 BidAsk: 2330 買:524.00 賣:525.00  ← 實際事件
+✅ 登出成功
+```
+
+## [0.4.1] - 2025-01-15
+
+### 🎯 主要改進 - 統一 API 設計
+
+- ✅ **統一登入 API**：移除冗餘的 `token_login` 和 `simulation_login` 方法
+- ✅ **簡化 API 介面**：使用統一的 `login()` 方法，根據 simulation 參數自動選擇模式
+- ✅ **完善 Mock 系統**：支援完整的無憑證開發環境
+- ✅ **修正初始化問題**：解決 `'NoneType' object has no attribute 'activated_ca'` 錯誤
+- ✅ **改進事件橋接**：更穩定的 Python-Rust 回調系統
+
+### 🐛 修復的問題
+
+- 🔧 移除與原始 shioaji 設計衝突的多餘登入方法
+- 🔧 修復 Mock 系統初始化錯誤
+- 🔧 改善錯誤處理和診斷資訊
+
+### 📝 API 變更
+
+**舊的 API (已移除)**：
+```rust
+// ❌ 已移除這些方法
+client.token_login(&api_key, &secret_key).await?;
+client.simulation_login(&api_key, &secret_key).await?;
+```
+
+**新的統一 API**：
+```rust
+// ✅ 統一使用這個方法
+client.login(&api_key, &secret_key, fetch_contract).await?;
+```
+
+## [0.4.0] - 2024-12-20
+
+### 🎯 主要功能
+
+- ✅ **完整的回調系統**：支援 Tick、BidAsk、Quote、Order 和系統事件回調
+- ✅ **Python-Rust 事件橋接**：高效能的跨語言事件處理
+- ✅ **強大的 Mock 系統**：支援無憑證的開發和測試環境
+- ✅ **類型安全**：完整的 Rust 類型定義，編譯時安全保證
+- ✅ **跨平台支援**：支援 Linux、macOS 和 Windows
+
+### 🚀 首次發布
+
+- 🎉 首次公開發布到 crates.io
+- 📦 完整的 Cargo 套件管理
+- 📚 詳細的 API 文件和使用範例
+- 🧪 完整的測試套件
+
+### 📋 支援的功能
+
+- 🔐 永豐證券 Shioaji API 完整集成
+- 📊 即時市場數據訂閱
+- 💰 股票和期貨交易
+- 📈 歷史數據查詢
+- 🔔 事件回調處理
+
+---
+
+**版本命名規則**：`主版本.次版本.修訂版本`
+- 主版本：不相容的 API 變更
+- 次版本：向下相容的功能新增
+- 修訂版本：向下相容的錯誤修復 

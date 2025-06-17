@@ -42,43 +42,33 @@ class MockSolaceAPI:
     # Callback methods
     def set_on_tick_stk_v1_callback(self, callback):
         self.callbacks['tick_stk_v1'] = callback
-        print(f"📝 Mock: Registered tick_stk_v1 callback")
     
     def set_on_tick_fop_v1_callback(self, callback):
         self.callbacks['tick_fop_v1'] = callback
-        print(f"📝 Mock: Registered tick_fop_v1 callback")
     
     def set_on_bidask_stk_v1_callback(self, callback):
         self.callbacks['bidask_stk_v1'] = callback
-        print(f"📝 Mock: Registered bidask_stk_v1 callback")
     
     def set_on_bidask_fop_v1_callback(self, callback):
         self.callbacks['bidask_fop_v1'] = callback
-        print(f"📝 Mock: Registered bidask_fop_v1 callback")
     
     def set_on_quote_stk_v1_callback(self, callback):
         self.callbacks['quote_stk_v1'] = callback
-        print(f"📝 Mock: Registered quote_stk_v1 callback")
     
     def set_event_callback(self, callback):
         self.callbacks['event'] = callback
-        print(f"📝 Mock: Registered event callback")
     
     def set_session_down_callback(self, callback):
         self.callbacks['session_down'] = callback
-        print(f"📝 Mock: Registered session_down callback")
     
     def set_quote_callback(self, callback):
         self.callbacks['quote'] = callback
-        print(f"📝 Mock: Registered quote callback")
     
     def set_order_callback(self, callback):
         self.callbacks['order'] = callback
-        print(f"📝 Mock: Registered order callback")
     
     # Core functionality methods
     def login(self, api_key, secret_key, fetch_contract=False):
-        print(f"🔑 Mock: Login called with api_key={api_key[:8]}..., simulation={self.simulation}")
         self.is_connected = True
         self.activated_ca = True
         # 返回模擬的帳戶列表
@@ -89,65 +79,92 @@ class MockSolaceAPI:
         return mock_accounts
     
     def logout(self):
-        print("🔌 Mock: Logout called")
         self.is_connected = False
         self.activated_ca = False
         return {"result": "success"}
     
     def subscribe(self, contract, quote_type="tick"):
-        print(f"📊 Mock: Subscribe called - contract={contract}, quote_type={quote_type}")
-        # 模擬成功訂閱並可能觸發一些測試回調
+        # 靜默訂閱，不產生不必要的輸出
         self._simulate_market_data(contract, quote_type)
         return {"result": "success"}
     
     def unsubscribe(self, contract, quote_type="tick"):
-        print(f"📊 Mock: Unsubscribe called - contract={contract}, quote_type={quote_type}")
         return {"result": "success"}
     
     def place_order(self, contract, order):
-        print(f"💰 Mock: Place order called - contract={contract}, order={order}")
         return {"result": "success", "order_id": "MOCK_ORDER_123"}
     
     def cancel_order(self, order_id):
-        print(f"❌ Mock: Cancel order called - order_id={order_id}")
         return {"result": "success"}
     
     def list_accounts(self):
-        print("📋 Mock: List accounts called")
         return [
             {"account": "1234567", "broker_id": "F002000", "account_type": "S", "signed": True},
             {"account": "F1234567", "broker_id": "F002000", "account_type": "F", "signed": True}
         ]
     
     def _simulate_market_data(self, contract, quote_type):
-        """模擬市場數據以測試回調功能"""
-        print(f"🎯 Mock: Simulating market data for contract={contract}, type={quote_type}")
-        
-        # 這裡可以觸發測試回調
-        # 在真實環境中，這些會由實際的市場數據觸發
+        """模擬市場數據以測試回調功能 - 靜默模式"""
+        # 模擬實際的市場數據並觸發回調
         import threading
         import time
+        import random
         
         def delayed_callback():
-            time.sleep(2)  # 延遲 2 秒模擬真實數據
-            print("📡 Mock: Triggering simulated market data callback")
+            time.sleep(1)  # 延遲 1 秒模擬真實數據延遲
             
-            # 如果有註冊的回調，可以在這裡觸發它們
-            if 'tick_stk_v1' in self.callbacks:
-                print("🎯 Mock: Would trigger tick callback here")
-            if 'bidask_stk_v1' in self.callbacks:
-                print("💰 Mock: Would trigger bidask callback here")
+            # 模擬並觸發 tick 數據回調
+            if quote_type == "tick" and 'tick_stk_v1' in self.callbacks:
+                try:
+                    # 建立模擬的 tick 資料
+                    mock_tick_data = {
+                        'code': getattr(contract, 'code', '2330'),
+                        'exchange': 'TSE',
+                        'close': round(500 + random.random() * 50, 2),
+                        'volume': random.randint(1000, 10000),
+                        'datetime': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    # 觸發回調
+                    callback = self.callbacks['tick_stk_v1']
+                    if callable(callback):
+                        callback('TSE', mock_tick_data)
+                        
+                except Exception as e:
+                    # 靜默處理錯誤，只記錄到日誌
+                    import logging
+                    logging.debug(f"Mock callback error: {e}")
+            
+            # 模擬並觸發 bidask 數據回調  
+            if quote_type in ["bidask", "tick"] and 'bidask_stk_v1' in self.callbacks:
+                try:
+                    mock_bidask_data = {
+                        'code': getattr(contract, 'code', '2330'),
+                        'exchange': 'TSE', 
+                        'bid_price': [round(499 + random.random() * 50, 2)] * 5,
+                        'ask_price': [round(501 + random.random() * 50, 2)] * 5,
+                        'bid_volume': [random.randint(100, 1000)] * 5,
+                        'ask_volume': [random.randint(100, 1000)] * 5,
+                        'datetime': time.strftime('%Y-%m-%d %H:%M:%S')
+                    }
+                    
+                    callback = self.callbacks['bidask_stk_v1']
+                    if callable(callback):
+                        callback('TSE', mock_bidask_data)
+                        
+                except Exception as e:
+                    import logging
+                    logging.debug(f"Mock bidask callback error: {e}")
         
         # 在背景執行緒中執行模擬
         thread = threading.Thread(target=delayed_callback)
         thread.daemon = True
         thread.start()
 
-# Enhanced mock class that handles attribute access dynamically
+# Enhanced mock class that handles attribute access dynamically  
 class EnhancedMockSolaceAPI(MockSolaceAPI):
     def __getattr__(self, name):
-        print(f"🔍 Mock: Dynamic attribute access: {name}")
-        # Return a lambda that accepts any arguments and returns self for chaining
+        # 靜默處理動態屬性存取
         if callable(getattr(MockSolaceAPI, name, None)):
             return getattr(MockSolaceAPI, self)
         return lambda *args, **kwargs: self
@@ -155,7 +172,6 @@ class EnhancedMockSolaceAPI(MockSolaceAPI):
 # Complete mock Shioaji class
 class MockShioaji:
     def __init__(self, simulation=True, proxies=None):
-        print(f"🔧 Mock: Creating Shioaji instance - simulation={simulation}")
         self.simulation = simulation
         self.proxies = proxies or {}
         self.activated_ca = False
@@ -166,7 +182,6 @@ class MockShioaji:
         self.is_connected = False
         
     def login(self, api_key, secret_key, fetch_contract=False):
-        print(f"🔑 MockShioaji: login called with simulation={self.simulation}")
         self.is_connected = True
         self.activated_ca = True
         
@@ -191,13 +206,11 @@ class MockShioaji:
         return self.accounts
     
     def logout(self):
-        print("🔌 MockShioaji: logout called")
         self.is_connected = False
         self.activated_ca = False
         return True
     
     def list_accounts(self):
-        print("📋 MockShioaji: list_accounts called")
         return self.accounts
 
 # Create all the mock modules that shioaji might try to import
@@ -291,9 +304,8 @@ if 'shioaji' not in sys.modules or not hasattr(sys.modules['shioaji'], 'Shioaji'
     
     # Add the mock Shioaji class
     shioaji_module.Shioaji = MockShioaji
-    print("🔧 Mock: Added MockShioaji class to shioaji module")
 
-print("✅ Mock backend modules installed successfully")
+# Mock modules installed silently for clean user experience
 "#;
         
         py.run(mock_code, None, None)?;

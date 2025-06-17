@@ -382,7 +382,7 @@ impl Shioaji {
         
         let quote_type_str = match quote_type {
             QuoteType::Tick => "tick",
-            QuoteType::BidAsk => "bidask",
+            QuoteType::BidAsk => "bidask", 
             QuoteType::Quote => "quote",
         };
         
@@ -395,6 +395,79 @@ impl Shioaji {
             )?;
             
             bindings.subscribe(py_instance, &py_contract, quote_type_str)?;
+        }
+        
+        log::info!("✅ 已訂閱合約 {} 的 {} 數據", contract.base.code, quote_type_str);
+        
+        // 如果是模擬模式，在背景觸發一些測試事件
+        if self.simulation {
+            let handlers = self.event_handlers.clone();
+            let contract_code = contract.base.code.clone();
+            let qt = quote_type.clone();
+            
+            tokio::spawn(async move {
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                
+                let handlers_guard = handlers.lock().await;
+                match qt {
+                    QuoteType::Tick => {
+                        if !handlers_guard.tick_callbacks.is_empty() {
+                            let mock_tick = crate::types::market_data::TickSTKv1 {
+                                code: contract_code.clone(),
+                                datetime: chrono::Utc::now(),
+                                open: 500.0,
+                                avg_price: 512.75,
+                                close: 525.5,
+                                high: 530.0,
+                                low: 495.0,
+                                amount: 787500.0,
+                                total_amount: 15750000.0,
+                                volume: 1500,
+                                total_volume: 15000,
+                                tick_type: crate::types::constants::TickType::Sell,
+                                chg_type: crate::types::constants::ChangeType::Up,
+                                price_chg: 25.5,
+                                pct_chg: 5.1,
+                                bid_side_total_vol: 7200,
+                                ask_side_total_vol: 7800,
+                                bid_side_total_cnt: 45,
+                                ask_side_total_cnt: 52,
+                                suspend: false,
+                                simtrade: true,
+                            };
+                            
+                            for callback in &handlers_guard.tick_callbacks {
+                                callback.on_tick_stk_v1(crate::types::constants::Exchange::TSE, mock_tick.clone());
+                            }
+                            log::info!("🎯 已觸發模擬 Tick 事件: {}", contract_code);
+                        }
+                    },
+                    QuoteType::BidAsk => {
+                        if !handlers_guard.bidask_callbacks.is_empty() {
+                            let mock_bidask = crate::types::market_data::BidAskSTKv1 {
+                                code: contract_code.clone(),
+                                datetime: chrono::Utc::now(),
+                                bid_price: vec![524.0, 523.5, 523.0, 522.5, 522.0],
+                                bid_volume: vec![100, 200, 150, 300, 250],
+                                diff_bid_vol: vec![10, -20, 5, 15, -10],
+                                ask_price: vec![525.0, 525.5, 526.0, 526.5, 527.0],
+                                ask_volume: vec![150, 180, 220, 160, 200],
+                                diff_ask_vol: vec![-5, 25, -10, 8, 12],
+                                suspend: false,
+                                simtrade: true,
+                            };
+                            
+                            for callback in &handlers_guard.bidask_callbacks {
+                                callback.on_bidask_stk_v1(crate::types::constants::Exchange::TSE, mock_bidask.clone());
+                            }
+                            log::info!("💰 已觸發模擬 BidAsk 事件: {}", contract_code);
+                        }
+                    },
+                    QuoteType::Quote => {
+                        log::debug!("📊 Quote 模擬數據尚未實作");
+                    }
+                }
+            });
         }
         
         Ok(())
