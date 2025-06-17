@@ -551,8 +551,8 @@ if 'shioaji' not in sys.modules or not hasattr(sys.modules['shioaji'], 'Shioaji'
         Ok(())
     }
 
-    /// Setup all callbacks with Python shioaji instance (simplified v0.3.0)
-    pub async fn setup_real_callbacks(&self, _instance: &PyObject) -> PyResult<()> {
+    /// Setup all callbacks with Python shioaji instance (real environment)
+    pub async fn setup_real_callbacks(&self, instance: &PyObject) -> PyResult<()> {
         if let Some(ref bridge) = self.event_bridge {
             let _registry = self.callback_registry.lock().await;
             
@@ -563,10 +563,93 @@ if 'shioaji' not in sys.modules or not hasattr(sys.modules['shioaji'], 'Shioaji'
                 )
             })?;
             
-            Python::with_gil(|_py| {
-                // Get callbacks from bridge
-                log::info!("✅ v0.3.9 Real event bridge callback system initialized");
-                log::info!("📋 Advanced event bridging with statistics and monitoring");
+            // Get all callbacks in async context first
+            let tick_stk_callback = bridge.get_python_callback("tick_stk_v1").await;
+            let tick_fop_callback = bridge.get_python_callback("tick_fop_v1").await;
+            let bidask_stk_callback = bridge.get_python_callback("bidask_stk_v1").await;
+            let bidask_fop_callback = bridge.get_python_callback("bidask_fop_v1").await;
+            let quote_stk_callback = bridge.get_python_callback("quote_stk_v1").await;
+            let order_callback = bridge.get_python_callback("order").await;
+            let event_callback = bridge.get_python_callback("system_event").await;
+            
+            Python::with_gil(|py| {
+                // Get the quote object from shioaji instance
+                let quote = instance.getattr(py, "quote").map_err(|e| {
+                    PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                        format!("Failed to get quote object: {}", e)
+                    )
+                })?;
+                
+                // Register tick callbacks to real shioaji instance
+                if let Some(callback) = tick_stk_callback {
+                    quote.call_method(py, "set_on_tick_stk_v1_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register tick_stk_v1 callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 tick_stk_v1 回調到真實 shioaji 實例");
+                }
+                
+                if let Some(callback) = tick_fop_callback {
+                    quote.call_method(py, "set_on_tick_fop_v1_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register tick_fop_v1 callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 tick_fop_v1 回調到真實 shioaji 實例");
+                }
+                
+                // Register bidask callbacks
+                if let Some(callback) = bidask_stk_callback {
+                    quote.call_method(py, "set_on_bidask_stk_v1_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register bidask_stk_v1 callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 bidask_stk_v1 回調到真實 shioaji 實例");
+                }
+                
+                if let Some(callback) = bidask_fop_callback {
+                    quote.call_method(py, "set_on_bidask_fop_v1_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register bidask_fop_v1 callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 bidask_fop_v1 回調到真實 shioaji 實例");
+                }
+                
+                // Register quote callbacks
+                if let Some(callback) = quote_stk_callback {
+                    quote.call_method(py, "set_on_quote_stk_v1_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register quote_stk_v1 callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 quote_stk_v1 回調到真實 shioaji 實例");
+                }
+                
+                // Register system callbacks to main instance (not quote object)
+                if let Some(callback) = order_callback {
+                    instance.call_method(py, "set_order_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register order callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 order 回調到真實 shioaji 實例");
+                }
+                
+                if let Some(callback) = event_callback {
+                    instance.call_method(py, "set_event_callback", (callback,), None)
+                        .map_err(|e| {
+                            log::warn!("Failed to register event callback: {}", e);
+                            e
+                        })?;
+                    log::debug!("✅ 已註冊 system_event 回調到真實 shioaji 實例");
+                }
+                
+                log::info!("✅ v0.4.3 Real event bridge callback system initialized");
+                log::info!("📋 所有回調函數已註冊到真實 shioaji 實例");
+                log::info!("🔗 Python-Rust 事件橋接已建立，準備接收市場數據");
                 
                 Ok(())
             })
@@ -577,8 +660,6 @@ if 'shioaji' not in sys.modules or not hasattr(sys.modules['shioaji'], 'Shioaji'
         }
     }
 
-
-    
     /// Get historical data
     pub fn get_kbars(&self,
                      instance: &PyObject,

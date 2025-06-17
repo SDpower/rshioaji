@@ -37,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::env::set_var("RUST_LOG", "info");
     env_logger::init();
     
-    println!("🚀 rshioaji v0.4.2 - 乾淨使用體驗示範");
+    println!("🚀 rshioaji v0.4.3 - 乾淨使用體驗示範");
     println!("{}", "=".repeat(50));
     
     // 建立客戶端（模擬模式）

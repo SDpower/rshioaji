@@ -72,7 +72,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _secret_key = std::env::var("SHIOAJI_SECRET_KEY").unwrap_or_else(|_| "YOUR_SECRET_KEY".to_string());
     
     // 💡 完整的登入流程示範
-    // 根據 rshioaji v0.4.2，統一使用 login() 方法：
+    // 根據 rshioaji v0.4.3，統一使用 login() 方法：
     // 1. 調用 login 方法（會根據 simulation 參數自動選擇正確的登入模式）
     // 2. 獲取 accounts 和 contract_download 資訊
     // 3. 設定錯誤追蹤 (error_tracking)

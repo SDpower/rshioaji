@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/rshioaji/badge.svg)](https://docs.rs/rshioaji)
 [![License](https://img.shields.io/crates/l/rshioaji)](https://github.com/stevelo/rshioaji/blob/main/LICENSE-MIT)
 
-**rshioaji v0.4.2** - 高效能的台灣永豐證券 Shioaji API Rust 綁定庫
+**🚀 rshioaji v0.4.3** - 永豐證券 Shioaji API 的高效能 Rust 封裝庫
 
 ## 🚀 主要特色
 
@@ -182,7 +182,14 @@ let accounts = client.login("demo_api_key", "demo_secret_key", false).await?;
 
 ## 🔄 版本更新
 
-### v0.4.2 (2025-01)
+### v0.4.3 (2025-06)
+
+- ✅ **真實環境回調修復**：解決用戶在真實 API 環境中無法收到市場事件的關鍵問題
+- ✅ **完整的事件橋接**：修復 `setup_real_callbacks` 方法，確保 Python 回調函數正確註冊
+- ✅ **程式碼庫清理**：移除開發階段的臨時測試檔案，保持程式碼整潔
+- ✅ **文件更新**：完善版本記錄和使用說明
+
+### v0.4.2 (2025-06)
 
 - ✅ **乾淨的 Mock 體驗**：移除大量調試訊息，提供專業級執行環境
 - ✅ **實際事件觸發**：修復 Mock 系統，確保回調事件能正確觸發
