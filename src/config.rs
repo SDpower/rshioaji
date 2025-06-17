@@ -191,20 +191,27 @@ mod tests {
 
     #[test]
     fn test_config_validation() {
-        let valid_config = Config::new();
+        // Test valid config
+        let mut valid_config = Config::new();
+        valid_config.api_key = "test_api_key".to_string();
+        valid_config.secret_key = "test_secret_key".to_string();
         assert!(valid_config.validate().is_ok());
 
+        // Test invalid config (empty keys)
         let invalid_config = Config::new();
         assert!(invalid_config.validate().is_err());
     }
 
     #[test]
     fn test_config_summary() {
-        let config = Config::new();
+        let mut config = Config::new();
+        config.api_key = "test_api_key".to_string();
+        config.secret_key = "test_secret_key".to_string();
         
         let summary = config.summary();
         assert!(summary.contains("simulation: true"));
-        assert!(!summary.contains("")); // Should not expose full key
+        assert!(summary.contains("test***")); // Should show partial key
+        assert!(!summary.contains("test_api_key")); // Should not expose full key
     }
 
     #[test]

@@ -81,9 +81,14 @@ pub enum Event {
         data: BidAskFOPv1,
         timestamp: DateTime<Utc>,
     },
-    Quote {
+    QuoteStk {
         exchange: Exchange,
         data: QuoteSTKv1,
+        timestamp: DateTime<Utc>,
+    },
+    Quote {
+        topic: String,
+        data: Value,
         timestamp: DateTime<Utc>,
     },
     Order {
@@ -96,6 +101,9 @@ pub enum Event {
         code: i32,
         message: String,
         details: String,
+        timestamp: DateTime<Utc>,
+    },
+    SessionDown {
         timestamp: DateTime<Utc>,
     },
 }
@@ -167,8 +175,10 @@ impl RealEventBridge {
             "bidask_stk_v1",
             "bidask_fop_v1",
             "quote_stk_v1",
+            "quote",
             "order",
             "system_event",
+            "session_down",
         ];
 
         for callback_type in callback_types {
@@ -300,14 +310,20 @@ enhanced_shioaji_callback
                 Event::BidAskFop { exchange, data, .. } => {
                     handlers.trigger_bidask_fop_v1(exchange, data);
                 }
-                Event::Quote { exchange, data, .. } => {
+                Event::QuoteStk { exchange, data, .. } => {
                     handlers.trigger_quote_stk_v1(exchange, data);
+                }
+                Event::Quote { topic, data, .. } => {
+                    handlers.trigger_quote(topic, data);
                 }
                 Event::Order { state, data, .. } => {
                     handlers.trigger_order(state, data);
                 }
                 Event::System { event_type, code, message, details, .. } => {
                     handlers.trigger_event(event_type, code, message, details);
+                }
+                Event::SessionDown { .. } => {
+                    handlers.trigger_session_down();
                 }
             }
         }
@@ -321,9 +337,9 @@ enhanced_shioaji_callback
         match event {
             Event::TickStk { .. } | Event::TickFop { .. } => stats.tick_events += 1,
             Event::BidAskStk { .. } | Event::BidAskFop { .. } => stats.bidask_events += 1,
-            Event::Quote { .. } => stats.quote_events += 1,
+            Event::QuoteStk { .. } | Event::Quote { .. } => stats.quote_events += 1,
             Event::Order { .. } => stats.order_events += 1,
-            Event::System { .. } => stats.system_events += 1,
+            Event::System { .. } | Event::SessionDown { .. } => stats.system_events += 1,
         }
         
         stats.last_event_time = Some(Utc::now());

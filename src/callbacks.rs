@@ -23,9 +23,10 @@
 //! 
 //! ## Usage
 //! 
-//! ```rust
+//! ```rust,no_run
 //! use rshioaji::{Shioaji, TickCallback, Exchange, TickSTKv1};
 //! use std::sync::Arc;
+//! use std::collections::HashMap;
 //! 
 //! struct MyHandler;
 //! 
@@ -39,12 +40,20 @@
 //!     }
 //! }
 //! 
-//! // Register the callback (this works)
-//! let handler = Arc::new(MyHandler);
-//! client.register_tick_callback(handler).await;
-//! 
-//! // Note: v0.3.0 supports automatic callback triggering from real market data
-//! // through the EventBridge system when setup_callbacks() is called
+//! #[tokio::main]
+//! async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//!     // Create client
+//!     let client = Shioaji::new(true, HashMap::new())?;
+//!     
+//!     // Register the callback
+//!     let handler = Arc::new(MyHandler);
+//!     client.register_tick_callback(handler).await;
+//!     
+//!     // Setup callbacks to enable automatic event triggering
+//!     client.setup_callbacks().await?;
+//!     
+//!     Ok(())
+//! }
 //! ```
 
 use std::sync::Arc;
