@@ -309,7 +309,7 @@ impl Shioaji {
         let instance = self.instance.lock().await;
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
-        let (py_contract, py_order, result) = {
+        let (_py_contract, _py_order, result) = {
             let bindings = self.bindings.lock().await;
             
             // Convert Rust contract to Python object
@@ -685,36 +685,86 @@ impl Shioaji {
     async fn register_all_shioaji_callbacks(&self, py_instance: &PyObject) -> Result<()> {
         // 先取得所有回調函數
         let tick_callback = self.real_event_bridge.get_python_callback("tick_stk_v1").await;
+        let tick_fop_callback = self.real_event_bridge.get_python_callback("tick_fop_v1").await;
         let bidask_callback = self.real_event_bridge.get_python_callback("bidask_stk_v1").await;
+        let bidask_fop_callback = self.real_event_bridge.get_python_callback("bidask_fop_v1").await;
         let quote_callback = self.real_event_bridge.get_python_callback("quote_stk_v1").await;
+        let general_quote_callback = self.real_event_bridge.get_python_callback("quote").await;
         let order_callback = self.real_event_bridge.get_python_callback("order").await;
+        let system_event_callback = self.real_event_bridge.get_python_callback("system_event").await;
+        let session_down_callback = self.real_event_bridge.get_python_callback("session_down").await;
 
         Python::with_gil(|py| {
-            // 註冊 tick 回調
-            if let Some(callback) = tick_callback {
-                if let Err(e) = py_instance.call_method(py, "set_on_tick_stk_v1_callback", (callback,), None) {
-                    log::warn!("無法設定 tick_stk_v1 callback: {:?}", e);
-                }
-            }
+            // 獲取 quote 物件用於設定 quote 相關的 callback
+            let quote_result = py_instance.getattr(py, "quote");
+            
+            match &quote_result {
+                Ok(quote) => {
+                    // 註冊 tick 回調
+                    if let Some(callback) = tick_callback {
+                        if let Err(e) = quote.call_method(py, "set_on_tick_stk_v1_callback", (callback,), None) {
+                            log::warn!("無法設定 tick_stk_v1 callback: {:?}", e);
+                        }
+                    }
 
-            // 註冊 bid/ask 回調
-            if let Some(callback) = bidask_callback {
-                if let Err(e) = py_instance.call_method(py, "set_on_bidask_stk_v1_callback", (callback,), None) {
-                    log::warn!("無法設定 bidask_stk_v1 callback: {:?}", e);
-                }
-            }
+                    // 註冊 bid/ask 回調
+                    if let Some(callback) = bidask_callback {
+                        if let Err(e) = quote.call_method(py, "set_on_bidask_stk_v1_callback", (callback,), None) {
+                            log::warn!("無法設定 bidask_stk_v1 callback: {:?}", e);
+                        }
+                    }
 
-            // 註冊 quote 回調
-            if let Some(callback) = quote_callback {
-                if let Err(e) = py_instance.call_method(py, "set_on_quote_stk_v1_callback", (callback,), None) {
-                    log::warn!("無法設定 quote_stk_v1 callback: {:?}", e);
-                }
-            }
+                    // 註冊 quote 回調
+                    if let Some(callback) = quote_callback {
+                        if let Err(e) = quote.call_method(py, "set_on_quote_stk_v1_callback", (callback,), None) {
+                            log::warn!("無法設定 quote_stk_v1 callback: {:?}", e);
+                        }
+                    }
 
-            // 註冊 order 回調
-            if let Some(callback) = order_callback {
-                if let Err(e) = py_instance.call_method(py, "set_order_callback", (callback,), None) {
-                    log::warn!("無法設定 order callback: {:?}", e);
+                    // 註冊 tick FOP 回調
+                    if let Some(callback) = tick_fop_callback {
+                        if let Err(e) = quote.call_method(py, "set_on_tick_fop_v1_callback", (callback,), None) {
+                            log::warn!("無法設定 tick_fop_v1 callback: {:?}", e);
+                        }
+                    }
+
+                    // 註冊 bidask FOP 回調
+                    if let Some(callback) = bidask_fop_callback {
+                        if let Err(e) = quote.call_method(py, "set_on_bidask_fop_v1_callback", (callback,), None) {
+                            log::warn!("無法設定 bidask_fop_v1 callback: {:?}", e);
+                        }
+                    }
+
+                    // 註冊系統事件回調 (在 quote 物件上)
+                    if let Some(callback) = system_event_callback {
+                        if let Err(e) = quote.call_method(py, "set_event_callback", (callback,), None) {
+                            log::warn!("無法設定 event callback: {:?}", e);
+                        }
+                    }
+
+                    // 註冊斷線事件回調 (在 quote 物件上)
+                    if let Some(callback) = session_down_callback {
+                        if let Err(e) = quote.call_method(py, "set_session_down_callback", (callback,), None) {
+                            log::warn!("無法設定 session_down callback: {:?}", e);
+                        }
+                    }
+
+                    // 註冊一般 quote 回調 (在 quote 物件上)
+                    if let Some(callback) = general_quote_callback {
+                        if let Err(e) = quote.call_method(py, "set_quote_callback", (callback,), None) {
+                            log::warn!("無法設定 quote callback: {:?}", e);
+                        }
+                    }
+
+                    // 註冊 order 回調 (在 quote 物件上，因為 quote == _solace)
+                    if let Some(callback) = order_callback {
+                        if let Err(e) = quote.call_method(py, "set_order_callback", (callback,), None) {
+                            log::warn!("無法設定 order callback: {:?}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::warn!("無法獲取 quote 物件: {:?}", e);
                 }
             }
 

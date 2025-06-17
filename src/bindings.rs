@@ -217,7 +217,7 @@ impl PythonBindings {
     /// Setup all callbacks with Python shioaji instance (simplified v0.3.0)
     pub async fn setup_real_callbacks(&self, _instance: &PyObject) -> PyResult<()> {
         if let Some(ref bridge) = self.event_bridge {
-            let mut registry = self.callback_registry.lock().await;
+            let _registry = self.callback_registry.lock().await;
             
             // Setup Python callbacks using the bridge
             bridge.setup_python_callbacks().await.map_err(|e| {
@@ -226,7 +226,7 @@ impl PythonBindings {
                 )
             })?;
             
-            Python::with_gil(|py| {
+            Python::with_gil(|_py| {
                 // Get callbacks from bridge
                 log::info!("✅ v0.3.5 Real event bridge callback system initialized");
                 log::info!("📋 Advanced event bridging with statistics and monitoring");

@@ -13,11 +13,11 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::time::{interval, Duration, Instant};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use log::{info, warn, error, debug};
+use log::{info, debug};
 
 use crate::client::Shioaji;
 use crate::types::*;
-use crate::event_bridge::{Event, RealEventBridge};
+// Removed unused imports: Event, RealEventBridge
 use crate::error::Result;
 
 /// 完整的 Shioaji 整合管理器
@@ -58,8 +58,7 @@ pub struct MarketDataManager {
     price_snapshots: HashMap<String, PriceSnapshot>,
     /// 市場數據統計
     market_stats: MarketStatistics,
-    /// 數據品質監控
-    data_quality: DataQualityMonitor,
+    // Removed unused field: data_quality: DataQualityMonitor,
 }
 
 /// 價格快照
@@ -106,8 +105,7 @@ pub struct DataQualityMonitor {
 pub struct OrderManager {
     /// 活躍訂單
     active_orders: HashMap<String, OrderInfo>,
-    /// 訂單歷史
-    order_history: Vec<OrderInfo>,
+    // Removed unused field: order_history: Vec<OrderInfo>,
     /// 執行統計
     execution_stats: ExecutionStatistics,
     /// 智能訂單功能
@@ -160,6 +158,7 @@ pub struct SmartOrderEngine {
     /// 條件訂單
     conditional_orders: HashMap<String, ConditionalOrder>,
     /// 演算法交易規則
+    #[allow(dead_code)]
     algo_rules: Vec<AlgoRule>,
 }
 
@@ -205,8 +204,10 @@ pub struct AlgoRule {
 #[derive(Debug)]
 pub struct RiskManager {
     /// 風險限制
+    #[allow(dead_code)]
     risk_limits: RiskLimits,
     /// 持倉監控
+    #[allow(dead_code)]
     position_monitor: PositionMonitor,
     /// 風險指標
     risk_metrics: RiskMetrics,
@@ -250,8 +251,10 @@ pub struct PerformanceTracker {
     /// 績效指標
     performance_metrics: PerformanceMetrics,
     /// 交易記錄
+    #[allow(dead_code)]
     trade_records: Vec<TradeRecord>,
     /// 分析報告
+    #[allow(dead_code)]
     analysis_reports: Vec<AnalysisReport>,
 }
 
@@ -523,14 +526,25 @@ pub enum SmartOrderType {
 }
 
 // 實作各個管理器的 new 方法
+impl Default for MarketDataManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MarketDataManager {
     pub fn new() -> Self {
         Self {
             subscribed_contracts: HashMap::new(),
             price_snapshots: HashMap::new(),
             market_stats: MarketStatistics::default(),
-            data_quality: DataQualityMonitor::default(),
         }
+    }
+}
+
+impl Default for OrderManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -538,10 +552,15 @@ impl OrderManager {
     pub fn new() -> Self {
         Self {
             active_orders: HashMap::new(),
-            order_history: Vec::new(),
             execution_stats: ExecutionStatistics::default(),
             smart_order_engine: SmartOrderEngine::default(),
         }
+    }
+}
+
+impl Default for RiskManager {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -562,6 +581,12 @@ impl RiskManager {
     }
 }
 
+impl Default for PerformanceTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceTracker {
     pub fn new() -> Self {
         Self {
@@ -569,6 +594,12 @@ impl PerformanceTracker {
             trade_records: Vec::new(),
             analysis_reports: Vec::new(),
         }
+    }
+}
+
+impl Default for IntegrationState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

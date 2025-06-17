@@ -38,13 +38,13 @@
 ```toml
 [dependencies]
 # 基本版本
-rshioaji = "0.3.5"
+rshioaji = "0.3.8"
 
 # 啟用高效能功能 (推薦)
-rshioaji = { version = "0.3.5", features = ["speed"] }
+rshioaji = { version = "0.3.8", features = ["speed"] }
 
-# 啟用所有功能 + 事件回調
-rshioaji = { version = "0.3.5", features = ["speed", "static-link"] }
+# 啟用所有功能 + 完整回調支援
+rshioaji = { version = "0.3.8", features = ["speed", "static-link"] }
 ```
 
 ### 可用功能 (Features)
@@ -55,50 +55,82 @@ rshioaji = { version = "0.3.5", features = ["speed", "static-link"] }
 | `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
 | `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
 
-## 🎯 新功能 v0.3.5 - 企業級整合管理系統
+## 🎯 新功能 v0.3.8 - 完整回調系統修復
 
-**✅ 重要更新：v0.3.5 完整實作狀態**
+**✅ 重要更新：v0.3.8 完整實作狀態**
 
-v0.3.5 實現了企業級的 Shioaji 整合管理系統，提供完整的交易解決方案：
+v0.3.8 修復並完善了事件回調系統，實現了完整的 Shioaji 回調功能：
 
-| 功能 | 狀態 | 說明 |
-|------|------|------|
-| ✅ **RealEventBridge** | 企業級實作 | 完整的真實事件橋接系統，支援高頻事件處理 |
-| ✅ **ShioajiIntegration** | 企業級實作 | 統一的整合管理器，提供完整的交易系統架構 |
-| ✅ **智能訂單引擎** | 企業級實作 | 支援 TWAP、條件訂單、演算法交易策略 |
-| ✅ **風險管理系統** | 企業級實作 | 即時風險監控、VaR 計算、自動停損 |
-| ✅ **績效追蹤系統** | 企業級實作 | 全方位績效分析和報告生成 |
-| ✅ **異步事件處理** | 企業級實作 | 基於 tokio 的高性能事件架構 |
+| 回調功能 | v0.3.8 狀態 | 說明 |
+|----------|-------------|------|
+| ✅ **股票 Tick 回調** | 完全修復 | `tick_stk_v1` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **期貨/選擇權 Tick 回調** | 新增支援 | `tick_fop_v1` 回調完整實作並註冊到 `api.quote` |
+| ✅ **股票買賣價差回調** | 完全修復 | `bidask_stk_v1` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **期貨/選擇權買賣價差回調** | 新增支援 | `bidask_fop_v1` 回調完整實作並註冊到 `api.quote` |
+| ✅ **股票報價回調** | 完全修復 | `quote_stk_v1` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **一般報價回調** | 完全修復 | `quote` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **系統事件回調** | 完全修復 | `system_event` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **斷線事件回調** | 完全修復 | `session_down` 回調正確註冊到 `api.quote` 物件 |
+| ✅ **訂單回調** | 完全修復 | `order` 回調正確註冊到 `api.quote` 物件 |
 
-### 企業級功能模組
+### v0.3.8 回調系統重大修復
 
-| 模組 | 功能 | 描述 | v0.3.5 狀態 |
-|------|------|------|-------------|
-| **RealEventBridge** | 事件橋接 | 高頻事件處理、統計監控、自動心跳 | ✅ 完整實作 |
-| **MarketDataManager** | 市場數據 | 即時價格、技術分析、數據品質監控 | ✅ 完整實作 |
-| **OrderManager** | 訂單管理 | 智能路由、批量處理、狀態追蹤 | ✅ 完整實作 |
-| **SmartOrderEngine** | 智能交易 | TWAP、條件訂單、演算法策略 | ✅ 完整實作 |
-| **RiskManager** | 風險控制 | VaR 計算、Beta 分析、自動停損 | ✅ 完整實作 |
-| **PerformanceTracker** | 績效分析 | 夏普比率、最大回撤、詳細報告 | ✅ 完整實作 |
+**🔧 核心修復問題：**
+- **問題**：原本所有 quote 相關回調都錯誤地註冊到主 Shioaji 實例上
+- **錯誤訊息**：`'Shioaji' object has no attribute 'set_on_tick_stk_v1_callback'`
+- **根本原因**：未正確使用 `api.quote` 物件來設定 quote 相關的回調
 
-### v0.3.5 企業級特點
+**✅ v0.3.8 完整修復：**
+1. **正確物件註冊**：quote 相關回調現在正確註冊到 `api.quote` 物件
+2. **完整回調支援**：新增所有缺失的回調類型註冊
+3. **錯誤處理改善**：改用 match 語法避免借用問題
+4. **程式碼品質**：通過 Rust 編譯器完整驗證
 
-- 🏢 **企業級架構**：完整的交易系統解決方案，適合機構投資者
-- 🧠 **智能訂單引擎**：支援多種演算法交易策略和條件執行
-- 📊 **全方位監控**：事件統計、性能監控、風險分析一體化
-- ⚡ **高頻交易支援**：專為高頻場景設計的事件處理架構
-- 🛡️ **企業級風控**：多層次風險管理和即時監控系統
-- 📈 **專業分析**：完整的績效評估和投資組合分析工具
-- 🔄 **異步處理**：基於 tokio 的高性能異步事件系統
-- 🎯 **靈活配置**：可根據需求選擇啟用的功能模組
+### v0.3.8 新增回調功能
 
-### v0.3.5 核心架構
+| 回調類型 | Python 方法 | 註冊位置 | v0.3.8 狀態 |
+|----------|-------------|----------|-------------|
+| **股票數據回調** | `set_on_tick_stk_v1_callback` | `api.quote` | ✅ 修復 |
+| **期貨/選擇權數據回調** | `set_on_tick_fop_v1_callback` | `api.quote` | 🆕 新增 |
+| **股票買賣價差回調** | `set_on_bidask_stk_v1_callback` | `api.quote` | ✅ 修復 |
+| **期貨/選擇權買賣價差回調** | `set_on_bidask_fop_v1_callback` | `api.quote` | 🆕 新增 |
+| **股票報價回調** | `set_on_quote_stk_v1_callback` | `api.quote` | ✅ 修復 |
+| **一般報價回調** | `set_quote_callback` | `api.quote` | ✅ 修復 |
+| **系統事件回調** | `set_event_callback` | `api.quote` | ✅ 修復 |
+| **斷線事件回調** | `set_session_down_callback` | `api.quote` | ✅ 修復 |
+| **訂單回調** | `set_order_callback` | `api.quote` | ✅ 修復 |
 
-- **ShioajiIntegration**：統一的整合管理器，提供完整的 API
-- **RealEventBridge**：企業級事件橋接，支援高頻事件處理
-- **SmartOrderType**：智能訂單類型定義和執行引擎
-- **RiskMetrics**：風險指標計算和監控系統
-- **PerformanceMetrics**：績效指標分析和報告生成
+### v0.3.8 技術改進
+
+- 🔧 **借用問題修復**：使用 match 語法取代多次 if let，避免 quote_result 移動問題
+- 📦 **完整回調支援**：實現所有 Python shioaji API 支援的回調類型
+- 🎯 **精確物件註冊**：根據 shioaji.py 原始碼，所有回調都註冊到正確的物件上
+- 🛡️ **錯誤處理強化**：每個回調註冊都有完善的錯誤日誌記錄
+- ⚡ **效能優化**：減少重複的物件獲取和錯誤處理邏輯
+- 📋 **程式碼品質**：通過 Rust 編譯器和 clippy 完整檢查
+
+### v0.3.8 關鍵修正
+
+**🔍 深度分析 shioaji.py 原始碼發現：**
+- `self.quote = self._solace` (Line 237) - quote 物件就是 _solace 物件！
+- `self._solace.set_order_callback(func)` (Line 978) - 訂單回調在 _solace 上
+- `api.quote.set_event_callback` - 系統事件回調在 quote 物件上 ✅
+- `api.quote.set_session_down_callback` - 斷線回調在 quote 物件上 ✅  
+- `api.quote.set_quote_callback` - 一般報價回調在 quote 物件上 ✅
+
+**🎯 關鍵發現：`quote == _solace`**
+- 在 shioaji.py 中，`self.quote = self._solace` (Line 237)
+- 雖然 Python 中有些回調用 `self._solace.xxx`，有些用 `self.quote.xxx`
+- 但它們實際上都指向同一個物件！
+- 這就是為什麼我們在 Rust 中統一註冊到 `api.quote` 物件
+
+**📋 完整的註冊位置對應表：**
+- **所有 9 個回調** → 全部註冊到 `api.quote` 物件 (`quote == _solace`)
+
+**🔧 實作細節：**
+- Python: `self._solace.set_order_callback(func)` 
+- Rust: `quote.call_method(py, "set_order_callback", ...)`
+- 效果相同，因為 `quote` 就是 `_solace` 物件
 
 ### 編譯選項
 
@@ -144,7 +176,7 @@ cd my-trading-app
 
 ```toml
 [dependencies]
-rshioaji = { version = "0.3.5", features = ["speed"] }
+rshioaji = { version = "0.3.8", features = ["speed"] }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
@@ -190,7 +222,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### 3. v0.3.5 企業級整合系統範例
+### 3. v0.3.8 完整回調系統範例
 
 ```rust
 use rshioaji::{
@@ -256,7 +288,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 初始化日誌系統
     rshioaji::init_logging();
     
-    println!("🚀 rshioaji v0.3.5 - 企業級整合管理系統範例");
+    println!("🚀 rshioaji v0.3.8 - 完整回調系統範例");
     
     let client = Shioaji::new(true, HashMap::new())?;
     client.init().await?;
@@ -285,11 +317,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         1000
     ).await?;
     
-    println!("✅ v0.3.5 企業級整合管理系統已啟動！");
-    println!("🏢 智能訂單引擎、風險管理、績效追蹤已就緒");
-    println!("📊 準備進行高級交易和分析...");
+    println!("✅ v0.3.8 完整回調系統已啟動！");
+    println!("📡 所有回調類型已正確註冊並可接收事件");
+    println!("🔧 期貨/選擇權、系統事件、斷線回調全面支援");
     
-    println!("🎯 系統狀態：企業級整合管理架構已實現");
+    println!("🎯 系統狀態：所有回調功能完整運作");
     
     Ok(())
 }
@@ -822,7 +854,7 @@ cargo build --release --features "speed,static-link"
 cargo new test-rshioaji && cd test-rshioaji
 
 # 添加依賴
-echo 'rshioaji = { version = "0.3.5", features = ["speed"] }' >> Cargo.toml
+echo 'rshioaji = { version = "0.3.8", features = ["speed"] }' >> Cargo.toml
 
 # 編譯測試
 cargo build
@@ -839,10 +871,10 @@ cargo build
 
 ```toml
 [dependencies]
-rshioaji = "0.3.5"  # 最新版本 (企業級整合系統)
+rshioaji = "0.3.8"  # 最新版本 (完整回調系統)
 ```
 
-- **版本**: 0.3.5
+- **版本**: 0.3.8
 - **授權**: MIT OR Apache-2.0
 - **平台**: macOS ARM64, Linux x86_64  
 - **Rust 版本**: 1.75+

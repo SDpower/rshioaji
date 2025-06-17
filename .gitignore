@@ -153,5 +153,5 @@ scripts/dev/logs/
 /lib/**/*.pyo
 /lib/**/*.pyd
 
-
-*.mdc
+.claude/
+.cursor/

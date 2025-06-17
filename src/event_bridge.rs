@@ -14,7 +14,7 @@ use tokio::sync::{Mutex, RwLock};
 use tokio::time::{interval, Duration};
 use chrono::{Utc, DateTime};
 use serde_json::Value;
-use log::{info, warn, error, debug};
+use log::{info, debug, warn};
 
 use crate::callbacks::EventHandlers;
 use crate::types::{Exchange, TickSTKv1, BidAskSTKv1, TickFOPv1, BidAskFOPv1, QuoteSTKv1};
@@ -182,7 +182,7 @@ impl RealEventBridge {
 
     /// 建立強化的 Python 回調函數
     async fn create_enhanced_python_callback(&self, callback_type: &str) -> Result<PyObject> {
-        let bridge_ptr = self as *const RealEventBridge as usize;
+        let _bridge_ptr = self as *const RealEventBridge as usize;
         let callback_type = callback_type.to_string();
         
         Python::with_gil(|py| {
@@ -495,7 +495,7 @@ pub mod conversion {
     pub fn dict_to_tick_stk(data: &PyDict) -> PyResult<TickSTKv1> {
         Ok(TickSTKv1 {
             code: extract_string(data, "code").unwrap_or_else(|| "UNKNOWN".to_string()),
-            datetime: extract_datetime(data, "datetime").unwrap_or_else(|| Utc::now()),
+            datetime: extract_datetime(data, "datetime").unwrap_or_else(Utc::now),
             open: extract_f64(data, "open"),
             avg_price: extract_f64(data, "avg_price"),
             close: extract_f64(data, "close"),
@@ -522,7 +522,7 @@ pub mod conversion {
     pub fn dict_to_bidask_stk(data: &PyDict) -> PyResult<BidAskSTKv1> {
         Ok(BidAskSTKv1 {
             code: extract_string(data, "code").unwrap_or_else(|| "UNKNOWN".to_string()),
-            datetime: extract_datetime(data, "datetime").unwrap_or_else(|| Utc::now()),
+            datetime: extract_datetime(data, "datetime").unwrap_or_else(Utc::now),
             bid_price: extract_f64_array(data, "bid_price", 5),
             bid_volume: extract_i64_array(data, "bid_volume", 5),
             diff_bid_vol: extract_i64_array(data, "diff_bid_vol", 5),
@@ -562,7 +562,7 @@ pub mod conversion {
             .and_then(|item| item.extract().ok())
     }
 
-    fn extract_datetime(data: &PyDict, key: &str) -> Option<DateTime<Utc>> {
+    fn extract_datetime(_data: &PyDict, _key: &str) -> Option<DateTime<Utc>> {
         // 這裡可以實作更複雜的日期時間解析
         Some(Utc::now())
     }

@@ -199,26 +199,20 @@ fn create_static_archive(lib_dir: &Path, _target_os: &str) {
     cmd.arg("rcs").arg(&archive_path);
     
     for so_file in &so_files {
-        cmd.arg(so_file);
+        cmd.arg(lib_dir.join(so_file));
     }
     
-    let output = cmd.current_dir(lib_dir).output();
-    
-    match output {
-        Ok(result) => {
-            if result.status.success() {
-                println!("cargo:warning=Created static archive: {} with {} files", 
-                         archive_name, so_files.len());
-                for file in &so_files {
-                    println!("cargo:warning=  - {}", file);
-                }
+    match cmd.output() {
+        Ok(output) => {
+            if output.status.success() {
+                println!("cargo:warning=Successfully created static archive: {}", archive_path.display());
             } else {
                 println!("cargo:warning=Failed to create static archive: {}", 
-                         String::from_utf8_lossy(&result.stderr));
+                         String::from_utf8_lossy(&output.stderr));
             }
         }
         Err(e) => {
-            println!("cargo:warning=Error running ar command: {}", e);
+            println!("cargo:warning=Failed to execute ar: {}", e);
         }
     }
-}
+} 
