@@ -67,9 +67,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("✅ Shioaji 客戶端初始化成功");
     println!("✅ Shioaji 客戶端初始化成功");
     
-    // 注意：請替換為您的實際 API 憑證
-    let _api_key = "YOUR_API_KEY";
-    let _secret_key = "YOUR_SECRET_KEY";
+    // 從環境變數讀取 API 憑證
+    let _api_key = std::env::var("SHIOAJI_API_KEY").unwrap_or_else(|_| "YOUR_API_KEY".to_string());
+    let _secret_key = std::env::var("SHIOAJI_SECRET_KEY").unwrap_or_else(|_| "YOUR_SECRET_KEY".to_string());
     
     // 💡 完整的登入流程示範
     // 根據 shioaji Python 原始碼，標準登入流程包括：
@@ -91,7 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   5️⃣  設定預設股票和期貨帳戶");
     
     // 步驟 1-5：呼叫 login 方法（內部會執行完整的登入流程）
-    let accounts = client.login(_api_key, _secret_key, true).await?;
+    let accounts = client.login(&_api_key, &_secret_key, true).await?;
     log::info!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
     println!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
     
@@ -257,7 +257,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     log::info!("🎉 示範完成！");
     println!("\n🎉 示範完成！");
-    println!("💡 要使用真實資料，請取消註解登入/登出區段並提供您的 API 憑證。");
+    println!("💡 要使用真實資料，請設定 .env 檔案並取消註解登入/登出區段。");
     println!("\n📚 完整的登入流程說明：");
     println!("   1️⃣  token_login/simulation_login - 驗證憑證並建立連線");
     println!("   2️⃣  獲取帳戶清單和合約下載資訊");
