@@ -10,7 +10,7 @@
 //! - ⚡ **Async Support**: Built on tokio for async operations
 //! - 🛡️ **Type Safety**: Complete Rust type definitions with compile-time checks
 //! 
-//! ## Version 0.3.5 - Advanced Real Event Bridging & Complete Shioaji Integration
+//! ## Version 0.3.9 - Advanced Real Event Bridging & Complete Shioaji Integration
 //! 
 //! This version introduces advanced real event bridging and complete shioaji integration:
 //! 

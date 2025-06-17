@@ -118,15 +118,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 模擬一些回調觸發（實際使用中這些會由市場資料觸發）
     // 這裡只是展示回調系統的架構
     
-    // ✅ v0.3.0 回調系統完整功能
-    println!("✅ rshioaji v0.3.0 - 完整回調系統功能：");
+    // ✅ v0.3.9 回調系統完整功能
+    println!("✅ rshioaji v0.3.9 - 完整回調系統功能：");
     println!("✅ 回調介面已完全實作並可註冊");
     println!("✅ 事件處理器系統已完整建置");
     println!("✅ Python-Rust 事件橋接已實作");
     println!("✅ EventBridge 和 CallbackRegistry 系統完整");
     println!("✅ 支援真實市場資料觸發回調 (概念驗證)");
     println!();
-    println!("🚀 v0.3.0 已實現功能：");
+    println!("🚀 v0.3.9 已實現功能：");
     println!("   • 完整的 Python-Rust 事件橋接");
     println!("   • 真實回調函數創建和管理");
     println!("   • 事件資料轉換和分發");

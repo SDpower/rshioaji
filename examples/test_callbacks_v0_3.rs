@@ -1,10 +1,10 @@
-//! # rshioaji v0.3.8 Complete Callback System Example
+//! # rshioaji v0.3.9 Complete Callback System Example
 //! 
-//! This example demonstrates the fully fixed Python-Rust event bridging capabilities
-//! of rshioaji v0.3.8, showing how to register all callback types and receive real-time
-//! market data events from Python shioaji through the corrected event bridge.
+//! This example demonstrates the fully optimized Python-Rust event bridging capabilities
+//! of rshioaji v0.3.9, showing how to register all callback types and receive real-time
+//! market data events from Python shioaji through the optimized event bridge.
 //!
-//! ## Key v0.3.8 Fixes:
+//! ## Key v0.3.9 Features:
 //! - All 9 callbacks now correctly registered to api.quote object
 //! - Discovered that quote == _solace in shioaji.py (Line 237)
 //! - Fixed callback registration from wrong api object to correct api.quote
@@ -95,7 +95,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let env_config = EnvironmentConfig::from_env();
     let _ = rshioaji::init_logging(&env_config);
     
-    println!("🚀 rshioaji v0.3.8 - Complete Callback System Example");
+    println!("🚀 rshioaji v0.3.9 - Complete Callback System Example");
     println!("================================================================");
     
     // Create Shioaji client
@@ -125,11 +125,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let system_handler = Arc::new(MySystemHandler);
     client.register_system_callback(system_handler).await;
     
-    // Setup the complete Python-Rust event bridge (v0.3.8)
+    // Setup the complete Python-Rust event bridge (v0.3.9)
     println!("🌉 Setting up Python-Rust event bridge...");
     match client.setup_callbacks().await {
         Ok(()) => {
-            println!("✅ v0.3.8 Event bridge initialized successfully!");
+            println!("✅ v0.3.9 Event bridge initialized successfully!");
             println!("   - All Python callbacks correctly registered to proper objects");
             println!("   - Quote callbacks use api.quote object (FIXED)");
             println!("   - System/Event callbacks use api.quote object (FIXED)");
@@ -144,7 +144,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => {
             println!("⚠️  Event bridge setup incomplete: {}", e);
             println!("   Note: This is expected without proper login credentials");
-            println!("   All callback registration fixes are in place for v0.3.8");
+            println!("   All callback registration fixes are in place for v0.3.9");
         }
     }
     
@@ -171,7 +171,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tokio::signal::ctrl_c().await?;
     */
     
-    println!("🎯 v0.3.8 Callback System Example completed!");
+    println!("🎯 v0.3.9 Callback System Example completed!");
     println!("   ✅ All callback types properly registered");
     println!("   ✅ Quote callbacks fixed to use api.quote object");
     println!("   ✅ System/Event callbacks fixed to use api.quote object");

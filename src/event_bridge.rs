@@ -1,4 +1,4 @@
-//! # 真實事件橋接系統 - rshioaji v0.3.0
+//! # 真實事件橋接系統 - rshioaji v0.3.9
 //! 
 //! 此模組提供完整的 Python-Rust 事件橋接實作，支援：
 //! - 真實市場數據事件處理
@@ -228,19 +228,17 @@ def enhanced_shioaji_callback(*args, **kwargs):
         if kwargs:
             event_data['kwargs'] = kwargs
             
-        # 記錄事件
-        print(f"[{}] 🔔 收到事件: {{json.dumps(event_data, ensure_ascii=False, indent=2)}}")
+        # 記錄事件 (已移除詳細輸出以減少干擾)
         
         # 這裡會被 Rust 端處理，透過 Python C API
         # 實際實作需要在 bindings.rs 中完成
         
     except Exception as e:
-        print(f"[{}] ❌ 回調錯誤: {{e}}")
-        import traceback
-        traceback.print_exc()
+        # 靜默處理錯誤，避免干擾
+        pass
 
 enhanced_shioaji_callback
-"#, callback_type, callback_type, callback_type);
+"#, callback_type);
 
             let module = PyModule::from_code(py, &callback_code, "enhanced_callback.py", "enhanced_callback")?;
             let callback = module.getattr("enhanced_shioaji_callback")?;

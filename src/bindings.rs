@@ -228,7 +228,7 @@ impl PythonBindings {
             
             Python::with_gil(|_py| {
                 // Get callbacks from bridge
-                log::info!("✅ v0.3.5 Real event bridge callback system initialized");
+                log::info!("✅ v0.3.9 Real event bridge callback system initialized");
                 log::info!("📋 Advanced event bridging with statistics and monitoring");
                 
                 Ok(())

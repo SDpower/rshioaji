@@ -1,4 +1,4 @@
-//! # Shioaji 完整整合模組 - rshioaji v0.3.0
+//! # Shioaji 完整整合模組 - rshioaji v0.3.9
 //! 
 //! 此模組提供完整的 shioaji 功能整合，包括：
 //! - 先進的市場數據管理
