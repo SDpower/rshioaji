@@ -1,15 +1,15 @@
 [package]
 name = "rshioaji"
-version = "0.4.0"
+version = "0.4.1"
 authors = ["Steve Lo <info@sd.idv.tw>"]
 edition = "2021"
-description = "Rust wrapper for Taiwan Shioaji API with full Python-Rust event bridging - A high-performance trading library"
+description = "Rust bindings for shioaji trading API with advanced callback support"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 homepage = "https://github.com/stevelo/rshioaji"
 repository = "https://github.com/stevelo/rshioaji"
 documentation = "https://docs.rs/rshioaji"
-keywords = ["shioaji", "trading", "taiwan", "api", "callbacks"]
+keywords = ["trading", "api", "shioaji", "finance", "taiwan"]
 categories = ["api-bindings", "finance"]
 exclude = [
     ".env*",

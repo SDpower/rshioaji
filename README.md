@@ -1,128 +1,203 @@
 # rshioaji
 
-一個用 Rust 封裝台灣永豐金證券 shioaji API 的高效能交易程式庫，具備完整的事件回調系統。
-
-[![Crates.io](https://img.shields.io/crates/v/rshioaji.svg)](https://crates.io/crates/rshioaji)
+[![Crates.io](https://img.shields.io/crates/v/rshioaji)](https://crates.io/crates/rshioaji)
 [![Documentation](https://docs.rs/rshioaji/badge.svg)](https://docs.rs/rshioaji)
-[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/stevelo/rshioaji)
+[![License](https://img.shields.io/crates/l/rshioaji)](https://github.com/stevelo/rshioaji/blob/main/LICENSE-MIT)
 
-**✅ 已成功發佈至 [crates.io](https://crates.io/crates/rshioaji)**
+**rshioaji v0.4.1** - 高效能的台灣永豐證券 Shioaji API Rust 綁定庫
 
-## 開發者資訊
+## 🚀 主要特色
 
-**開發者**: Steve Lo  
-**聯絡方式**: info@sd.idv.tw  
-**專案性質**: 概念驗證 (Proof of Concept) 專案
-
-## 特點
-
-- 🚀 **高效能**：基於 Rust 實現，提供優秀的執行效能和記憶體安全
-- 🔗 **相容性**：使用原始 Python C 擴展 (.so 檔案)，確保完整功能相容性
-- 🌐 **多平台支援**：支援 macOS ARM64 和 Linux x86_64 平台
-- 📦 **靜態連結**：支援將 .so 檔案內嵌至執行檔，無運行時依賴
-- 🐳 **容器化**：提供 Docker 支援，便於部署和分發
-- ⚡ **非同步**：基於 tokio 實現非同步操作
-- 🛡️ **型別安全**：完整的 Rust 型別定義，編譯時錯誤檢查
-- 🔧 **環境變數管理**：完整的環境變數處理和驗證，對應 Python utils.py
-- 📝 **日誌系統**：與 Python 版本相同格式的日誌系統
-- 🔍 **錯誤追蹤**：支援 Sentry 整合和錯誤監控
-- 🔑 **完整登入流程**：實現與 Python 版本相同的標準登入步驟
-- 📡 **完整回調系統**：✅ **v0.4.0 全面修復** - 支援 tick、bidask、quote、order、system 等所有事件類型
-- 🔧 **SolaceAPI 修復**：✅ **v0.4.0 完全解決** - 徹底修復 SolaceAPI 匯入問題
-- 🌉 **Python-Rust 橋接**：✅ **v0.4.0 穩定運作** - 真實事件橋接系統
+- **統一的 API 設計**：簡化的登入流程，使用統一的 `login()` 方法
+- **完整的回調系統**：支援 Tick、BidAsk、Quote、Order 和系統事件回調
+- **Python-Rust 事件橋接**：高效能的跨語言事件處理
+- **強大的 Mock 系統**：支援無憑證的開發和測試環境
+- **類型安全**：完整的 Rust 類型定義，編譯時安全保證
+- **跨平台支援**：支援 Linux、macOS 和 Windows
 
 ## 📦 安裝
 
-### 從 crates.io 安裝 (推薦)
-
-在您的 `Cargo.toml` 中添加：
-
 ```toml
 [dependencies]
-# 基本版本 (v0.4.0 - 回調系統修復版)
-rshioaji = "0.4.0"
-
-# 啟用高效能功能 (推薦)
-rshioaji = { version = "0.4.0", features = ["speed"] }
-
-# 啟用所有功能 + 完整回調支援
-rshioaji = { version = "0.4.0", features = ["speed", "static-link"] }
+rshioaji = "0.4.1"
 ```
 
-### 可用功能 (Features)
+## 🔧 快速開始
 
-| 功能 | 描述 | 用途 |
-|------|------|------|
-| `speed` | 🚀 高效能時間處理 | 等效於 Python `shioaji[speed]`，提升日期時間處理效能 |
-| `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
-| `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
+### 基本使用
 
-## 🎉 重大更新 v0.4.0 - 回調系統修復完成
+```rust
+use rshioaji::{Shioaji, TickCallback, Exchange, TickSTKv1, TickFOPv1};
+use std::collections::HashMap;
+use std::sync::Arc;
 
-**✅ 重要里程碑：v0.4.0 回調系統全面修復**
+// 創建 Tick 回調處理器
+struct MyTickHandler;
 
-v0.4.0 是一個重要的修復版本，徹底解決了回調系統的核心問題：
+impl TickCallback for MyTickHandler {
+    fn on_tick_stk_v1(&self, _exchange: Exchange, tick: TickSTKv1) {
+        println!("收到股票 Tick: {} @ {}", tick.code, tick.close);
+    }
+    
+    fn on_tick_fop_v1(&self, _exchange: Exchange, tick: TickFOPv1) {
+        println!("收到期貨 Tick: {} @ {}", tick.code, tick.close);
+    }
+}
 
-| 修復項目 | v0.4.0 狀態 | 說明 |
-|----------|-------------|------|
-| ✅ **SolaceAPI 匯入錯誤** | 完全修復 | 徹底解決了阻止回調系統運作的 SolaceAPI 匯入問題 |
-| ✅ **Python-Rust 橋接** | 正常運作 | 事件橋接系統已穩定運作，可正常註冊和觸發回調 |
-| ✅ **所有回調類型** | 全面支援 | tick、bidask、quote、order、system 等所有事件類型 |
-| ✅ **Mock 系統** | 智能處理 | 建立完整的 mock 系統，確保相容性和穩定性 |
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 建立客戶端
+    let client = Shioaji::new(true, HashMap::new())?; // true = 模擬模式
+    client.init().await?;
+    
+    // 登入
+    let accounts = client.login("api_key", "secret_key", true).await?;
+    println!("登入成功！找到 {} 個帳戶", accounts.len());
+    
+    // 註冊回調處理器
+    client.register_tick_callback(Arc::new(MyTickHandler)).await;
+    client.setup_callbacks().await?;
+    
+    // 訂閱市場數據
+    let stock = client.create_stock("2330", Exchange::TSE);
+    client.subscribe(stock.contract, rshioaji::QuoteType::Tick).await?;
+    
+    // 登出
+    client.logout().await?;
+    
+    Ok(())
+}
+```
 
-### v0.4.0 主要修復
-
-**🔧 核心問題解決：**
-- **SolaceAPI 匯入修復**：建立完整的 mock 模組系統，繞過不相容的共享函式庫
-- **回調註冊機制**：修復回調處理器的註冊和觸發機制
-- **事件橋接穩定性**：確保 Python-Rust 事件橋接的穩定運作
-
-**✅ v0.4.0 全新功能：**
-1. **智能 Mock 系統**：自動處理 SolaceAPI 相容性問題
-2. **增強錯誤處理**：更完善的錯誤追蹤和處理機制
-3. **完整測試範例**：提供多個測試範例驗證回調功能
-
-### 編譯選項
+### 環境變數配置
 
 ```bash
-# 基本編譯
-cargo build
-
-# 啟用高效能功能  
-cargo build --features speed
-
-# 生產環境編譯 (推薦)
-cargo build --release --features "speed,static-link"
+# .env 檔案
+SHIOAJI_API_KEY=your_api_key
+SHIOAJI_SECRET_KEY=your_secret_key
+SHIOAJI_SIMULATION=true
 ```
 
-## 支援平台
+```rust
+use rshioaji::Config;
 
-- **macOS ARM64** (`macosx_arm`)
-- **Linux x86_64** (`manylinux_x86_64`)
+// 從環境變數載入配置
+let config = Config::from_env()?;
+let client = Shioaji::new(config.simulation, HashMap::new())?;
+```
 
-## 開發環境需求
+## 📋 功能特色
 
-### 系統需求
-- Rust 1.75+
-- Python 3.12+ (完整支援並測試驗證)
-- 對應平台的 shioaji C 擴展檔案
+### 統一的登入流程
 
-### 開發依賴
-- PyO3 0.20+
-- tokio 1.0+
-- serde 1.0+
+v0.4.1 簡化了登入 API，移除了多餘的 `token_login` 和 `simulation_login` 方法：
 
-## 🚀 快速開始
+```rust
+// ✅ 統一使用 login() 方法
+let accounts = client.login(&api_key, &secret_key, true).await?;
 
-### 1. 安裝套件
+// 內部會根據 simulation 參數自動選擇正確的登入模式
+```
+
+### 完整的回調系統
+
+```rust
+use rshioaji::{TickCallback, BidAskCallback, SystemCallback};
+
+// 實現多種回調 trait
+struct EventHandler;
+
+impl TickCallback for EventHandler {
+    fn on_tick_stk_v1(&self, exchange: Exchange, tick: TickSTKv1) {
+        // 處理股票 Tick 數據
+    }
+    
+    fn on_tick_fop_v1(&self, exchange: Exchange, tick: TickFOPv1) {
+        // 處理期貨 Tick 數據
+    }
+}
+
+impl BidAskCallback for EventHandler {
+    fn on_bidask_stk_v1(&self, exchange: Exchange, bidask: BidAskSTKv1) {
+        // 處理股票 BidAsk 數據
+    }
+    
+    fn on_bidask_fop_v1(&self, exchange: Exchange, bidask: BidAskFOPv1) {
+        // 處理期貨 BidAsk 數據
+    }
+}
+
+impl SystemCallback for EventHandler {
+    fn on_event(&self, event_type: i32, code: i32, message: String, details: String) {
+        // 處理系統事件
+    }
+    
+    fn on_session_down(&self) {
+        // 處理連線中斷
+    }
+}
+
+// 註冊回調
+let handler = Arc::new(EventHandler);
+client.register_tick_callback(handler.clone()).await;
+client.register_bidask_callback(handler.clone()).await;
+client.register_system_callback(handler.clone()).await;
+```
+
+### 強大的 Mock 系統
+
+支援無真實憑證的開發和測試：
+
+```rust
+// 建立模擬環境客戶端
+let client = Shioaji::new(true, HashMap::new())?; // simulation = true
+
+// 使用假憑證進行測試
+let accounts = client.login("fake_api_key", "fake_secret_key", false).await?;
+
+// 正常使用所有功能進行開發測試
+```
+
+## 🔄 版本更新
+
+### v0.4.1 (2024-01)
+
+- ✅ **統一登入 API**：移除多餘的 `token_login`/`simulation_login`，統一使用 `login()` 方法
+- ✅ **完善 Mock 系統**：支援完整的無憑證開發環境
+- ✅ **修正初始化問題**：解決 `'NoneType' object has no attribute 'activated_ca'` 錯誤
+- ✅ **改進事件橋接**：更穩定的 Python-Rust 回調系統
+- ✅ **增強錯誤處理**：更好的錯誤訊息和診斷資訊
+
+### v0.4.0
+
+- ✅ 完整的回調系統實現
+- ✅ Python-Rust 事件橋接
+- ✅ 支援所有主要的市場數據類型
+- ✅ 跨平台相容性
+
+## 📚 文件
+
+- [API 文件](https://docs.rs/rshioaji)
+- [使用範例](examples/)
+- [登入流程說明](docs/login_flow.md)
+- [環境設定指南](docs/environment_setup.md)
+
+## 🧪 測試
 
 ```bash
-# 創建新的 Rust 專案
-cargo new my-trading-app
-cd my-trading-app
+# 執行所有測試
+cargo test
 
-# 編輯 Cargo.toml 添加依賴
+# 執行範例
+cargo run --example basic_usage
+cargo run --example callback_example
 ```
+
+## 🤝 貢獻
+
+歡迎提交 Issue 和 Pull Request！
+
+## 📄 授權
 
 ```toml
 [dependencies]

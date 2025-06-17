@@ -72,94 +72,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let _secret_key = std::env::var("SHIOAJI_SECRET_KEY").unwrap_or_else(|_| "YOUR_SECRET_KEY".to_string());
     
     // 💡 完整的登入流程示範
-    // 根據 shioaji Python 原始碼，標準登入流程包括：
-    // 1. 調用 token_login 或 simulation_login
+    // 根據 rshioaji v0.4.1，統一使用 login() 方法：
+    // 1. 調用 login 方法（會根據 simulation 參數自動選擇正確的登入模式）
     // 2. 獲取 accounts 和 contract_download 資訊
     // 3. 設定錯誤追蹤 (error_tracking)
     // 4. 如果 fetch_contract 為 true，則獲取合約資料
     // 5. 設定預設股票和期貨帳戶
     
     // 登入（若沒有憑證請註解掉）
-    /*
-    log::info!("🔑 開始登入流程...");
-    println!("\n🔑 開始登入流程...");
-    println!("📋 執行標準登入步驟：");
-    println!("   1️⃣  調用 login 方法 (內部會呼叫 token_login 或 simulation_login)");
-    println!("   2️⃣  獲取帳戶清單和合約下載資訊");
-    println!("   3️⃣  設定錯誤追蹤系統");
-    println!("   4️⃣  下載合約資料 (fetch_contract=true)");
-    println!("   5️⃣  設定預設股票和期貨帳戶");
-    
-    // 步驟 1-5：呼叫 login 方法（內部會執行完整的登入流程）
-    let accounts = client.login(&_api_key, &_secret_key, true).await?;
-    log::info!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
-    println!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
-    
-    // 顯示帳戶資訊
-    for (i, account) in accounts.iter().enumerate() {
-        let account_info = format!(
-            "📊 帳戶 {} - ID: {} ({}), 類型: {:?}, 已簽署: {}",
-            i + 1, account.account_id, account.username, account.account_type, account.signed
-        );
-        log::info!("{}", account_info);
-        println!("{}", account_info);
-        
-        // 根據帳戶類型顯示詳細資訊
-        match account.account_type {
-            rshioaji::AccountType::Stock => {
-                log::debug!("   🏦 股票帳戶 - 可進行證券交易");
-                println!("   🏦 股票帳戶 - 可進行證券交易");
-            },
-            rshioaji::AccountType::Future => {
-                log::debug!("   🔮 期貨帳戶 - 可進行期貨/選擇權交易");
-                println!("   🔮 期貨帳戶 - 可進行期貨/選擇權交易");
-            }
-        }
-    }
-    
-    // 步驟 6：檢查並設定預設帳戶
-    log::info!("🔧 檢查預設帳戶設定...");
-    println!("\n🔧 檢查預設帳戶設定...");
-    if let Some(stock_account) = client.get_default_stock_account().await {
-        let msg = format!("✅ 預設股票帳戶：{}", stock_account.account.account_id);
-        log::info!("{}", msg);
-        println!("{}", msg);
-    } else {
-        log::warn!("⚠️  尚未設定預設股票帳戶");
-        println!("⚠️  尚未設定預設股票帳戶");
-    }
-    
-    if let Some(future_account) = client.get_default_future_account().await {
-        let msg = format!("✅ 預設期貨帳戶：{}", future_account.account.account_id);
-        log::info!("{}", msg);
-        println!("{}", msg);
-    } else {
-        log::warn!("⚠️  尚未設定預設期貨帳戶");
-        println!("⚠️  尚未設定預設期貨帳戶");
-    }
-    
-    // 步驟 7：列出所有可用帳戶
-    log::info!("📋 列出所有可用帳戶...");
-    println!("\n📋 列出所有可用帳戶...");
-    let all_accounts = client.list_accounts().await?;
-    let summary = format!("總共有 {} 個可用帳戶", all_accounts.len());
-    log::info!("{}", summary);
-    println!("{}", summary);
-    
-    for account in &all_accounts {
-        let account_info = format!(
-            "   - {} ({}) - {} 帳戶",
-            account.account_id,
-            account.username,
-            match account.account_type {
-                rshioaji::AccountType::Stock => "股票",
-                rshioaji::AccountType::Future => "期貨",
-            }
-        );
-        log::debug!("{}", account_info);
-        println!("{}", account_info);
-    }
-    */
+    // let accounts = client.login(&_api_key, &_secret_key, true).await?;
     
     // 建立範例合約
     log::info!("📈 建立範例合約...");

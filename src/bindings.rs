@@ -88,16 +88,6 @@ class MockSolaceAPI:
         ]
         return mock_accounts
     
-    def token_login(self, api_key, secret_key, fetch_contract=False):
-        """Shioaji 的 token_login 方法"""
-        print(f"🔑 Mock: Token login called with api_key={api_key[:8]}..., simulation={self.simulation}")
-        return self.login(api_key, secret_key, fetch_contract)
-    
-    def simulation_login(self, api_key, secret_key, fetch_contract=False):
-        """Shioaji 的 simulation_login 方法"""
-        print(f"🔑 Mock: Simulation login called with api_key={api_key[:8]}..., simulation={self.simulation}")
-        return self.login(api_key, secret_key, fetch_contract)
-    
     def logout(self):
         print("🔌 Mock: Logout called")
         self.is_connected = False
@@ -162,6 +152,54 @@ class EnhancedMockSolaceAPI(MockSolaceAPI):
             return getattr(MockSolaceAPI, self)
         return lambda *args, **kwargs: self
 
+# Complete mock Shioaji class
+class MockShioaji:
+    def __init__(self, simulation=True, proxies=None):
+        print(f"🔧 Mock: Creating Shioaji instance - simulation={simulation}")
+        self.simulation = simulation
+        self.proxies = proxies or {}
+        self.activated_ca = False
+        self.accounts = []
+        self.quote = EnhancedMockSolaceAPI()
+        self.stock_account = None
+        self.futopt_account = None
+        self.is_connected = False
+        
+    def login(self, api_key, secret_key, fetch_contract=False):
+        print(f"🔑 MockShioaji: login called with simulation={self.simulation}")
+        self.is_connected = True
+        self.activated_ca = True
+        
+        # 設定模擬帳戶
+        self.accounts = [
+            type('MockAccount', (), {
+                'account_id': '1234567',
+                'broker_id': 'F002000', 
+                'username': 'MockUser',
+                'account_type': 'S',
+                'signed': True
+            })(),
+            type('MockAccount', (), {
+                'account_id': 'F1234567',
+                'broker_id': 'F002000',
+                'username': 'MockUser',
+                'account_type': 'F', 
+                'signed': True
+            })()
+        ]
+        
+        return self.accounts
+    
+    def logout(self):
+        print("🔌 MockShioaji: logout called")
+        self.is_connected = False
+        self.activated_ca = False
+        return True
+    
+    def list_accounts(self):
+        print("📋 MockShioaji: list_accounts called")
+        return self.accounts
+
 # Create all the mock modules that shioaji might try to import
 modules_to_mock = [
     'shioaji.backend',
@@ -172,6 +210,8 @@ modules_to_mock = [
     'shioaji.backend.solace.bidask',
     'shioaji.backend.solace.quote',
     'shioaji.backend.solace.tick',
+    'shioaji.contracts',
+    'shioaji.order',
 ]
 
 for module_name in modules_to_mock:
@@ -189,6 +229,33 @@ for module_name in modules_to_mock:
             mock_module.__path__ = []  # Make it a package
         elif module_name == 'shioaji.backend':
             mock_module.__path__ = []  # Make it a package
+        elif module_name == 'shioaji.contracts':
+            # Add mock contract classes
+            class MockContract:
+                def __init__(self, **kwargs):
+                    self.code = kwargs.get('code', 'MOCK')
+                    self.exchange = kwargs.get('exchange', 'TSE')
+                    self.security_type = kwargs.get('security_type', 'STK')
+                    for k, v in kwargs.items():
+                        setattr(self, k, v)
+                        
+            mock_module.Stock = MockContract
+            mock_module.Future = MockContract
+            mock_module.Option = MockContract
+            mock_module.Index = MockContract
+        elif module_name == 'shioaji.order':
+            # Add mock order class
+            class MockOrder:
+                def __init__(self, **kwargs):
+                    self.action = kwargs.get('action', 'Buy')
+                    self.price = kwargs.get('price', 0.0)
+                    self.quantity = kwargs.get('quantity', 1000)
+                    self.order_type = kwargs.get('order_type', 'ROD')
+                    self.price_type = kwargs.get('price_type', 'LMT')
+                    for k, v in kwargs.items():
+                        setattr(self, k, v)
+                        
+            mock_module.Order = MockOrder
         elif module_name.endswith('.utils') or module_name.endswith('.bidask') or module_name.endswith('.quote') or module_name.endswith('.tick'):
             # Create a dynamic mock module that can handle any attribute request
             class DynamicMockModule:
@@ -213,6 +280,18 @@ for module_name in modules_to_mock:
             mock_module.__all__ = []
         
         sys.modules[module_name] = mock_module
+
+# Create mock shioaji main module if needed
+if 'shioaji' not in sys.modules or not hasattr(sys.modules['shioaji'], 'Shioaji'):
+    if 'shioaji' not in sys.modules:
+        shioaji_module = types.ModuleType('shioaji')
+        sys.modules['shioaji'] = shioaji_module
+    else:
+        shioaji_module = sys.modules['shioaji']
+    
+    # Add the mock Shioaji class
+    shioaji_module.Shioaji = MockShioaji
+    print("🔧 Mock: Added MockShioaji class to shioaji module")
 
 print("✅ Mock backend modules installed successfully")
 "#;
@@ -326,67 +405,14 @@ print("✅ Mock backend modules installed successfully")
             
             let instance = shioaji_class.call(py, (), Some(kwargs))?;
             
-            // 為 mock 環境添加必要的屬性
-            if let Err(_) = instance.getattr(py, "activated_ca") {
-                // 如果沒有 activated_ca 屬性，添加一個
-                instance.setattr(py, "activated_ca", false)?;
-                log::info!("📝 Added activated_ca attribute to Shioaji instance");
+            // 確保實例不是 None
+            if instance.is_none(py) {
+                return Err(PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(
+                    "Failed to create Shioaji instance - got None"
+                ));
             }
             
-            // 確保有 quote 屬性 (mock SolaceAPI)
-            if let Err(_) = instance.getattr(py, "quote") {
-                // 創建一個 mock quote 對象
-                let mock_quote = py.eval("EnhancedMockSolaceAPI()", None, Some(&PyDict::new(py)))?;
-                instance.setattr(py, "quote", mock_quote)?;
-                log::info!("📝 Added mock quote attribute to Shioaji instance");
-            }
-            
-            // 添加必要的登入方法到 Shioaji 實例
-            let login_methods = r#"
-def mock_token_login(api_key, secret_key, fetch_contract=False):
-    print(f"🔑 Shioaji Mock: token_login called")
-    return [
-        {"account": "1234567", "broker_id": "F002000", "account_type": "S", "signed": True},
-        {"account": "F1234567", "broker_id": "F002000", "account_type": "F", "signed": True}
-    ]
-
-def mock_simulation_login(api_key, secret_key, fetch_contract=False):
-    print(f"🔑 Shioaji Mock: simulation_login called")
-    return [
-        {"account": "1234567", "broker_id": "F002000", "account_type": "S", "signed": True},
-        {"account": "F1234567", "broker_id": "F002000", "account_type": "F", "signed": True}
-    ]
-
-def mock_login(api_key, secret_key, fetch_contract=False):
-    print(f"🔑 Shioaji Mock: login called")
-    return [
-        {"account": "1234567", "broker_id": "F002000", "account_type": "S", "signed": True},
-        {"account": "F1234567", "broker_id": "F002000", "account_type": "F", "signed": True}
-    ]
-"#;
-            
-            let globals = PyDict::new(py);
-            py.run(login_methods, Some(globals), None)?;
-            
-            // 如果沒有登入方法，添加 mock 方法
-            if let Err(_) = instance.getattr(py, "token_login") {
-                let token_login = globals.get_item("mock_token_login").unwrap();
-                instance.setattr(py, "token_login", token_login)?;
-                log::info!("📝 Added mock token_login method to Shioaji instance");
-            }
-            
-            if let Err(_) = instance.getattr(py, "simulation_login") {
-                let simulation_login = globals.get_item("mock_simulation_login").unwrap();
-                instance.setattr(py, "simulation_login", simulation_login)?;
-                log::info!("📝 Added mock simulation_login method to Shioaji instance");
-            }
-            
-            if let Err(_) = instance.getattr(py, "login") {
-                let login = globals.get_item("mock_login").unwrap();
-                instance.setattr(py, "login", login)?;
-                log::info!("📝 Added mock login method to Shioaji instance");
-            }
-            
+            log::info!("✅ Shioaji instance created successfully with simulation={}", simulation);
             Ok(instance)
         })
     }

@@ -56,7 +56,7 @@ impl Shioaji {
     /// Login to shioaji
     /// 
     /// 完整的登入流程包括：
-    /// 1. 調用 token_login 或 simulation_login
+    /// 1. 調用 login 方法（會根據 simulation 參數自動選擇正確的登入模式）
     /// 2. 獲取 accounts 和 contract_download 資訊
     /// 3. 設定錯誤追蹤 (error_tracking)
     /// 4. 如果 fetch_contract 為 true，則獲取合約資料
@@ -66,8 +66,8 @@ impl Shioaji {
         let py_instance = instance.as_ref().ok_or(Error::NotLoggedIn)?;
         
         // 步驟 1: 調用 Python shioaji 的 login 方法
-        // 這會內部處理 token_login 或 simulation_login 的邏輯
-        log::info!("🔑 開始登入流程 - 調用 token_login/simulation_login");
+        // login 方法會根據實例的 simulation 設定自動選擇正確的登入模式
+        log::info!("🔑 開始登入流程 - 調用 login 方法");
         let _result = {
             let bindings = self.bindings.lock().await;
             bindings.login(py_instance, api_key, secret_key, fetch_contract)?

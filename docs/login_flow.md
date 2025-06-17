@@ -6,30 +6,18 @@
 
 ## 🔄 完整登入流程
 
-### 1. **調用 token_login 或 simulation_login**
+### 1. **調用 login 方法**
 
 ```python
 # Python 版本的核心邏輯
-if self._simu_to_stag:
-    # 模擬轉正式環境的特殊流程
-    accounts, contract_download, person_id = self._solace_implicit.token_login(
-        api_key, secret_key, subscribe_trade, receive_window
-    )
-    simulation_token = self._solace_implicit.session._token
-    self._solace_implicit.logout()
-    accounts, contract_download = self._solace.simulation_login(
-        simulation_token, person_id, subscribe_trade,
-    )
-else:
-    # 標準登入流程
-    accounts, contract_download, person_id = self._solace.token_login(
-        api_key, secret_key, subscribe_trade, receive_window
-    )
+# Shioaji 會根據實例的 simulation 設定自動選擇正確的登入模式
+accounts = api.login(api_key, secret_key, fetch_contract=fetch_contract)
 ```
 
 **重要說明：**
-- `token_login`：使用 API 金鑰和密鑰進行實際市場登入
-- `simulation_login`：使用模擬環境登入
+- `login()`：統一的登入方法，會根據 `simulation` 參數自動選擇正確的登入模式
+- 內部會自動調用 `token_login` 或 `simulation_login`
+- 用戶不需要直接調用 `token_login` 或 `simulation_login`
 - 回傳值包含：帳戶清單、合約下載資訊、個人識別碼
 
 ### 2. **獲取 accounts 和 contract_download 資訊**
@@ -139,9 +127,9 @@ pub async fn login(&self, api_key: &str, secret_key: &str, fetch_contract: bool)
 ```
 開始登入
     ↓
-呼叫 token_login/simulation_login
+呼叫 login 方法
     ↓
-驗證憑證 & 建立連線
+驗證憑證 & 建立連線（內部自動選擇 token_login 或 simulation_login）
     ↓
 獲取帳戶清單 & 合約下載資訊
     ↓
