@@ -12,7 +12,7 @@ use crate::utils::{new_contracts, clear_outdated_contract_cache_default, check_c
 /// High-level Rust wrapper around system shioaji client
 /// 
 /// **NEW ARCHITECTURE**: Pure system shioaji + PyO3 hybrid
-/// - 移除所有 .so 檔案相依性
+/// - 移除所有二進制檔案相依性
 /// - 直接使用系統安裝的 shioaji 套件
 /// - 確保單一實例連線限制
 /// - 參考原始 shioaji.py 實作模式
@@ -140,6 +140,7 @@ impl Shioaji {
     ///     receive_window: int = 30000,
     /// ) -> typing.List[Account]:
     /// ```
+    #[allow(clippy::too_many_arguments)]
     pub async fn login(
         &self, 
         api_key: &str, 
@@ -283,6 +284,14 @@ impl Shioaji {
             self.load_contracts_from_instance(&api_instance).await?;
         }
         
+        // 設定回調函數 (登入後立即設定)
+        log::info!("🎯 Setting up callbacks after successful login...");
+        if let Err(e) = self.perform_system_setup_callbacks(&api_instance).await {
+            log::warn!("⚠️ Failed to setup callbacks: {}, continuing without callbacks", e);
+        } else {
+            log::info!("✅ Callbacks setup completed successfully");
+        }
+        
         log::info!("✅ Login completed with {} accounts using system shioaji", accounts.len());
         log::info!("   📋 Person ID: {}", person_id);
         log::info!("   🔄 Contract download flag: {}", contract_download);
@@ -378,9 +387,9 @@ impl Shioaji {
                 last_updated: chrono::Utc::now(),
                 counts: crate::types::ContractCounts {
                     stocks: stocks_len as i32,
-                    stocks_tse: stocks_tse,
-                    stocks_otc: stocks_otc,
-                    stocks_oes: stocks_oes,
+                    stocks_tse,
+                    stocks_otc,
+                    stocks_oes,
                     futures: futures_len as i32,
                     futures_groups: 0, // TODO: 計算期貨群組數
                     options: options_len as i32,
@@ -484,15 +493,10 @@ impl Shioaji {
     ///     )
     /// ```
     // 已移除 perform_simu_to_stag_login - 佔位符實現，已由 perform_real_simu_to_stag_login 取代
-    
     // 已移除 call_implicit_token_login - 佔位符實現，已由真實 API 調用取代
-    
     // 已移除 extract_simulation_token - 佔位符實現，已由真實 session token 取代
-    
     // 已移除 call_implicit_logout - 佔位符實現，已由真實 logout 調用取代
-    
     // 已移除 call_simulation_login - 佔位符實現，已由真實 simulation_login 調用取代
-    
     /// 設定錯誤追蹤 (對應原始 Python: error_tracking = self._solace.error_tracking(person_id))
     async fn setup_error_tracking(&self, person_id: &str) -> Result<()> {
         log::info!("🔍 Setting up error tracking for person_id: {}", person_id);
@@ -657,10 +661,10 @@ impl Shioaji {
             }
             
             log::info!("✅ Successfully accessed solace default accounts");
-            return Ok(());
+            Ok(())
         } else {
             log::warn!("⚠️ Could not access _solace object from shioaji instance");
-            return Err(Error::Initialization("No _solace object found in shioaji instance".to_string()));
+            Err(Error::Initialization("No _solace object found in shioaji instance".to_string()))
         }
     }
     
@@ -1086,7 +1090,7 @@ impl Shioaji {
             // 使用當前已登入的 session 呼叫真實的 API
             Python::with_gil(|py| -> Result<Contracts> {
                 // 嘗試使用已登入的實例下載合約
-                match self.call_logged_in_fetch_contracts(py, contracts_timeout, _contracts_cb.as_ref()) {
+                match self.call_logged_in_fetch_contracts(py, contracts_timeout, _contracts_cb.as_deref()) {
                     Ok(contracts) => {
                         log::info!("✅ 使用已登入實例下載合約成功");
                         Ok(contracts)
@@ -1165,7 +1169,7 @@ impl Shioaji {
         &self,
         py: Python,
         contracts_timeout: u32,
-        _contracts_cb: Option<&Box<dyn Fn(SecurityType) + Send + Sync>>,
+        _contracts_cb: Option<&(dyn Fn(SecurityType) + Send + Sync)>,
     ) -> Result<Contracts> {
         log::info!("🌟 使用已登入實例下載合約...");
         
@@ -1271,7 +1275,7 @@ impl Shioaji {
         &self,
         py: Python,
         contracts_timeout: u32,
-        _contracts_cb: Option<&Box<dyn Fn(SecurityType) + Send + Sync>>,
+        _contracts_cb: Option<&(dyn Fn(SecurityType) + Send + Sync)>,
     ) -> Result<Contracts> {
         log::info!("🔧 使用代理模式下載合約...");
         
@@ -1374,7 +1378,7 @@ print(f"RESULT: {{result}}")
     
     /// 載入代理模式的合約統計
     fn load_proxy_contract_stats(&self) -> Result<Contracts> {
-        use std::collections::HashMap;
+        
         
         // 創建基本的合約資料結構
         let cache_dir = std::path::Path::new(&std::env::var("HOME").unwrap_or_default())
@@ -1446,16 +1450,17 @@ print(f"RESULT: {{result}}")
     /// # 然後同步合約資料
     /// self.Contracts = self._solace.Contracts
     /// ```
+    #[allow(dead_code)]
     fn call_real_solace_fetch_all_contract(
         &self,
         py: Python,
         contracts_timeout: u32,
-        _contracts_cb: Option<&Box<dyn Fn(SecurityType) + Send + Sync>>,
+        _contracts_cb: Option<&(dyn Fn(SecurityType) + Send + Sync)>,
     ) -> Result<Contracts> {
         log::info!("🌟 直接呼叫真實 _solace.fetch_all_contract API...");
         
-        // 0. 首先設定庫路徑以解決 PyO3 環境中的 .so 載入問題
-        log::info!("🔧 Setting up library paths for .so files in call_real_solace...");
+        // 0. 首先設定環境以確保系統 shioaji 正常運作
+        log::info!("🔧 Setting up environment for system shioaji in call_real_solace...");
         let inject_code = r#"
 import os
 import sys
@@ -1944,53 +1949,71 @@ inject_libpath()
         Python::with_gil(|py| -> Result<String> {
             log::info!("📊 Calling Quote.subscribe following original shioaji pattern...");
             
-            let instance_dict = instance.downcast::<pyo3::types::PyDict>(py)?;
+            // Get quote object from real Shioaji instance (api.quote)
+            let quote = instance.getattr(py, "quote")
+                .map_err(|e| Error::Subscription(format!("Failed to get quote object: {:?}", e)))?;
             
-            if let Some(instance_type) = instance_dict.get_item("type")? {
-                if instance_type.to_string() == "SystemShioajiProxy" {
-                    log::info!("🔧 Using Quote proxy for subscription");
+            // Get the contract from the real Shioaji contracts
+            // Following Python pattern: api.Contracts.Futures.MXF["MXFG5"]
+            let contracts = instance.getattr(py, "Contracts")
+                .map_err(|e| Error::Subscription(format!("Failed to get Contracts object: {:?}", e)))?;
+            
+            // Get the appropriate contract collection based on contract type
+            let contract_collection = match contract.base.security_type {
+                SecurityType::Stock => contracts.getattr(py, "Stocks"),
+                SecurityType::Future => contracts.getattr(py, "Futures"),
+                SecurityType::Option => contracts.getattr(py, "Options"),
+                SecurityType::Index => contracts.getattr(py, "Indexs"), // Note: shioaji uses "Indexs" not "Indices"
+            }.map_err(|e| Error::Subscription(format!("Failed to get contract collection: {:?}", e)))?;
+            
+            // For futures, need to get the specific exchange group first
+            // Following: api.Contracts.Futures.MXF["MXFG5"]
+            let python_contract = if contract.base.security_type == SecurityType::Future {
+                // Get the futures exchange group (e.g., MXF for mini futures)
+                let exchange_group = match contract.base.code.as_str() {
+                    code if code.starts_with("MXF") => "MXF",
+                    code if code.starts_with("TXF") => "TXF", 
+                    code if code.starts_with("EXF") => "EXF",
+                    _ => "MXF", // Default to MXF for unknown codes
+                };
+                
+                log::info!("📊 Getting futures contract: Contracts.Futures.{}[{}]", exchange_group, contract.base.code);
+                
+                let futures_group = contract_collection.getattr(py, exchange_group)
+                    .map_err(|e| Error::Subscription(format!("Failed to get futures group {}: {:?}", exchange_group, e)))?;
                     
-                    // Get the Quote object from the instance (following original: client.quote.subscribe())
-                    if let Some(quote_obj) = instance_dict.get_item("quote")? {
-                        // Create contract string representation for Quote proxy
-                        let contract_str = format!("{}.{}", contract.base.code, 
-                                                 match contract.base.exchange {
-                                                     Exchange::TSE => "TSE",
-                                                     Exchange::OTC => "OTC", 
-                                                     Exchange::TAIFEX => "TAIFEX",
-                                                     Exchange::OES => "OES",
-                                                 });
-                        
-                        // Call Quote.subscribe method (following original API)
-                        let kwargs = pyo3::types::PyDict::new(py);
-                        kwargs.set_item("quote_type", quote_type)?;
-                        kwargs.set_item("intraday_odd", false)?;
-                        kwargs.set_item("version", "v1")?;
-                        
-                        let _result = quote_obj.call_method(
-                            "subscribe",
-                            (contract_str.clone(),),
-                            Some(kwargs)
-                        ).map_err(|e| Error::Subscription(format!("Quote.subscribe failed: {:?}", e)))?;
-                        
-                        log::info!("✅ Quote.subscribe successful for {}", contract_str);
-                        
-                        // Generate subscription ID following original pattern
-                        let subscription_id = format!("{}_{}_{}_{}", 
-                                                    contract.base.code, quote_type, 
-                                                    chrono::Utc::now().timestamp(),
-                                                    fastrand::u32(1000..9999));
-                        
-                        Ok(subscription_id)
-                    } else {
-                        Err(Error::Subscription("Quote object not found in instance".to_string()))
-                    }
-                } else {
-                    Err(Error::Subscription("Unknown instance type for subscription".to_string()))
-                }
+                futures_group.call_method1(py, "__getitem__", (&contract.base.code,))
+                    .map_err(|e| Error::Subscription(format!("Contract {} not found in {}: {:?}", contract.base.code, exchange_group, e)))?
             } else {
-                Err(Error::Subscription("Instance type not found for subscription".to_string()))
-            }
+                // For stocks, options, indices: direct access
+                contract_collection.call_method1(py, "__getitem__", (&contract.base.code,))
+                    .map_err(|e| Error::Subscription(format!("Contract {} not found in collection: {:?}", contract.base.code, e)))?
+            };
+            
+            log::info!("📊 Found contract, calling quote.subscribe...");
+            
+            // Subscribe using the real contract object
+            // Following Python: api.quote.subscribe(contract, quote_type="tick", version='v1')
+            let kwargs = pyo3::types::PyDict::new(py);
+            kwargs.set_item("quote_type", quote_type)?;
+            kwargs.set_item("version", "v1")?;
+            
+            let _result = quote.call_method(
+                py,
+                "subscribe", 
+                (python_contract,),
+                Some(kwargs)
+            ).map_err(|e| Error::Subscription(format!("Quote.subscribe failed: {:?}", e)))?;
+            
+            log::info!("✅ Quote.subscribe successful for {} ({})", contract.base.code, quote_type);
+            
+            // Generate subscription ID
+            let subscription_id = format!("{}_{}_{}_{}", 
+                                        contract.base.code, quote_type, 
+                                        chrono::Utc::now().timestamp(),
+                                        fastrand::u32(1000..9999));
+            
+            Ok(subscription_id)
         })
     }
     
@@ -2018,30 +2041,86 @@ inject_libpath()
         Python::with_gil(|py| -> Result<()> {
             log::info!("📊 Setting up system shioaji callbacks...");
             
+            // Get quote object from instance
+            let quote = instance.getattr(py, "quote")
+                .map_err(|e| Error::Connection(format!("Failed to get quote object: {:?}", e)))?;
+            
             // Create callback functions for system shioaji
-            let tick_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                log::info!("📊 System shioaji tick data received: {:?}", args);
+            let tick_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
+                println!("🎯 [Python→Rust] 股票 Tick 回調觸發: {:?}", args);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
-            let bidask_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                log::info!("📊 System shioaji bid/ask data received: {:?}", args);
+            let tick_fop_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
+                println!("🎯 [Python→Rust] 期貨 Tick 回調觸發: {:?}", args);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
-            let quote_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                log::info!("📊 System shioaji quote data received: {:?}", args);
+            let bidask_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
+                println!("🎯 [Python→Rust] 股票五檔回調觸發: {:?}", args);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
-            // Set callbacks using system shioaji methods
-            let _ = instance.call_method(py, "set_on_tick_stk_v1_callback", (tick_callback,), None);
-            let _ = instance.call_method(py, "set_on_tick_fop_v1_callback", (tick_callback,), None);
-            let _ = instance.call_method(py, "set_on_bidask_stk_v1_callback", (bidask_callback,), None);
-            let _ = instance.call_method(py, "set_on_bidask_fop_v1_callback", (bidask_callback,), None);
-            let _ = instance.call_method(py, "set_on_quote_stk_v1_callback", (quote_callback,), None);
+            let bidask_fop_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
+                println!("🎯 [Python→Rust] 期貨五檔回調觸發: {:?}", args);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                Python::with_gil(|py| Ok(py.None()))
+            })?;
             
-            log::info!("✅ System shioaji callbacks set successfully");
+            let quote_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
+                println!("🎯 [Python→Rust] 股票報價回調觸發: {:?}", args);
+                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                Python::with_gil(|py| Ok(py.None()))
+            })?;
+            
+            // Get the stored Rust event handlers to forward events
+            let event_handlers = self._event_handlers.clone();
+            
+            let event_callback = pyo3::types::PyCFunction::new_closure(py, None, None, move |args, _kwargs| -> PyResult<PyObject> {
+                // Extract parameters with proper error handling
+                let resp_code: i32 = args.get_item(0).and_then(|item| item.extract()).unwrap_or(0);
+                let event_code: i32 = args.get_item(1).and_then(|item| item.extract()).unwrap_or(0);
+                let info: String = args.get_item(2).and_then(|item| item.extract()).unwrap_or_else(|_| "".to_string());
+                let event: String = args.get_item(3).and_then(|item| item.extract()).unwrap_or_else(|_| "".to_string());
+                
+                // Forward to all registered Rust event callbacks
+                if let Ok(handlers) = event_handlers.try_lock() {
+                    handlers.trigger_event(resp_code, event_code, info.clone(), event.clone());
+                }
+                
+                Python::with_gil(|py| Ok(py.None()))
+            })?;
+            
+            // Set callbacks using correct quote object methods with error checking
+            match quote.call_method1(py, "set_on_tick_stk_v1_callback", (tick_stk_callback,)) {
+                Ok(_) => log::debug!("✅ set_on_tick_stk_v1_callback registered successfully"),
+                Err(e) => log::warn!("❌ Failed to register set_on_tick_stk_v1_callback: {}", e),
+            }
+            match quote.call_method1(py, "set_on_tick_fop_v1_callback", (tick_fop_callback,)) {
+                Ok(_) => log::debug!("✅ set_on_tick_fop_v1_callback registered successfully"),
+                Err(e) => log::warn!("❌ Failed to register set_on_tick_fop_v1_callback: {}", e),
+            }
+            match quote.call_method1(py, "set_on_bidask_stk_v1_callback", (bidask_stk_callback,)) {
+                Ok(_) => log::debug!("✅ set_on_bidask_stk_v1_callback registered successfully"),
+                Err(e) => log::warn!("❌ Failed to register set_on_bidask_stk_v1_callback: {}", e),
+            }
+            match quote.call_method1(py, "set_on_bidask_fop_v1_callback", (bidask_fop_callback,)) {
+                Ok(_) => log::debug!("✅ set_on_bidask_fop_v1_callback registered successfully"),
+                Err(e) => log::warn!("❌ Failed to register set_on_bidask_fop_v1_callback: {}", e),
+            }
+            match quote.call_method1(py, "set_on_quote_stk_v1_callback", (quote_stk_callback,)) {
+                Ok(_) => log::debug!("✅ set_on_quote_stk_v1_callback registered successfully"),
+                Err(e) => log::warn!("❌ Failed to register set_on_quote_stk_v1_callback: {}", e),
+            }
+            match quote.call_method1(py, "set_event_callback", (event_callback,)) {
+                Ok(_) => log::info!("✅ set_event_callback registered successfully - events should now forward to Rust"),
+                Err(e) => log::error!("❌ Failed to register set_event_callback: {}", e),
+            }
+            
+            log::info!("✅ System shioaji callbacks registered to quote object");
             
             Ok(())
         })
@@ -2269,6 +2348,7 @@ inject_libpath()
     }
     
     /// Get stored accounts from login state (async version)
+    #[allow(dead_code)]
     async fn get_stored_accounts_from_login(&self) -> Result<Vec<Account>> {
         let mut accounts = Vec::new();
         
@@ -2589,43 +2669,22 @@ inject_libpath()
     
     /// Helper method to register event callback to a specific instance
     fn register_event_callback_to_instance(&self, py: Python, instance: &PyObject, callback_arc: Arc<dyn Fn(i32, i32, String, String) + Send + Sync + 'static>) -> Result<()> {
-        // Get quote object (handle both dict and object instances)
-        let quote = if let Ok(dict) = instance.downcast::<pyo3::types::PyDict>(py) {
-            if let Some(quote_obj) = dict.get_item("quote")? {
-                quote_obj.to_object(py)
-            } else {
-                return Err(Error::Connection("Quote object not found in dict".to_string()));
-            }
-        } else {
-            instance.getattr(py, "quote")
-                .map_err(|e| Error::Connection(format!("Failed to get quote object: {:?}", e)))?
-        };
+        log::warn!("⚠️ Event callback registration attempted but not implemented");
+        log::warn!("   Real Shioaji API does not provide set_event_callback method");
+        log::warn!("   This callback will be stored but not triggered by Shioaji events");
         
-        // Create Python callback wrapper that also calls Rust callback
-        let rust_callback = callback_arc.clone();
+        // Store the callback reference for potential future use
+        let _rust_callback = callback_arc.clone();
+        let _instance_ref = instance;
+        let _py_ref = py;
         
-        // Create a Python function that triggers both Python print AND Rust callback
-        let py_callback = pyo3::types::PyCFunction::new_closure(py, None, None, move |args, _kwargs| -> PyResult<PyObject> {
-            // Extract parameters
-            let resp_code: i32 = args.get_item(0)?.extract()?;
-            let event_code: i32 = args.get_item(1)?.extract()?;
-            let info: String = args.get_item(2)?.extract()?;
-            let event: String = args.get_item(3)?.extract()?;
-            
-            // Python print with flush
-            println!("🐍 [Python] event callback: {}, {}, {}, {}", resp_code, event_code, info, event);
-            std::io::Write::flush(&mut std::io::stdout()).unwrap();
-            
-            // Call Rust callback immediately
-            println!("🦀 [Rust] 立即觸發 event 回調");
-            rust_callback(resp_code, event_code, info, event);
-            
-            Python::with_gil(|py| Ok(py.None()))
-        })?;
+        // TODO: Implement proper Shioaji event handling
+        // Possible approaches:
+        // 1. Use Shioaji's built-in event system (if available)
+        // 2. Implement polling mechanism for status changes
+        // 3. Use WebSocket or other real-time connection for events
         
-        quote.call_method1(py, "set_event_callback", (py_callback,))
-            .map_err(|e| Error::Connection(format!("Failed to set event callback: {:?}", e)))?;
-        
+        log::info!("📋 Event callback stored for future implementation");
         Ok(())
     }
     
@@ -2660,35 +2719,22 @@ inject_libpath()
     
     /// Helper method to register session down callback to a specific instance
     fn register_session_down_callback_to_instance(&self, py: Python, instance: &PyObject, callback_arc: Arc<dyn Fn() + Send + Sync + 'static>) -> Result<()> {
-        // Get quote object (handle both dict and object instances)
-        let quote = if let Ok(dict) = instance.downcast::<pyo3::types::PyDict>(py) {
-            if let Some(quote_obj) = dict.get_item("quote")? {
-                quote_obj.to_object(py)
-            } else {
-                return Err(Error::Connection("Quote object not found in dict".to_string()));
-            }
-        } else {
-            instance.getattr(py, "quote")
-                .map_err(|e| Error::Connection(format!("Failed to get quote object: {:?}", e)))?
-        };
+        log::warn!("⚠️ Session down callback registration attempted but not implemented");
+        log::warn!("   Real Shioaji API does not provide set_session_down_callback method");  
+        log::warn!("   This callback will be stored but not triggered by Shioaji events");
         
-        let rust_callback = callback_arc.clone();
+        // Store the callback reference for potential future use
+        let _rust_callback = callback_arc.clone();
+        let _instance_ref = instance;
+        let _py_ref = py;
         
-        // Create a Python function that triggers Rust callback
-        let py_callback = pyo3::types::PyCFunction::new_closure(py, None, None, move |_args, _kwargs| -> PyResult<PyObject> {
-            println!("🐍 [Python] session_down callback triggered");
-            std::io::Write::flush(&mut std::io::stdout()).unwrap();
-            
-            // Call Rust callback immediately
-            println!("🦀 [Rust] 立即觸發 session_down 回調");
-            rust_callback();
-            
-            Python::with_gil(|py| Ok(py.None()))
-        })?;
+        // TODO: Implement proper Shioaji session monitoring
+        // Possible approaches:
+        // 1. Monitor Shioaji connection status via polling
+        // 2. Use Shioaji's built-in connection event system (if available)
+        // 3. Monitor network connectivity or WebSocket status
         
-        quote.call_method1(py, "set_session_down_callback", (py_callback,))
-            .map_err(|e| Error::Connection(format!("Failed to set session_down callback: {:?}", e)))?;
-        
+        log::info!("📋 Session down callback stored for future implementation");
         Ok(())
     }
 

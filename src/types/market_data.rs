@@ -207,3 +207,110 @@ pub struct UsageStatus {
     pub rate_limit_remaining: i32,
     pub rate_limit_reset: DateTime<Utc>,
 }
+
+// Simple Default implementations for callback data types
+impl Default for TickSTKv1 {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            datetime: Utc::now(),
+            open: 0.0,
+            avg_price: 0.0,
+            close: 0.0,
+            high: 0.0,
+            low: 0.0,
+            amount: 0.0,
+            total_amount: 0.0,
+            volume: 0,
+            total_volume: 0,
+            tick_type: TickType::No,
+            chg_type: ChangeType::Unchanged,
+            price_chg: 0.0,
+            pct_chg: 0.0,
+            bid_side_total_vol: 0,
+            ask_side_total_vol: 0,
+            bid_side_total_cnt: 0,
+            ask_side_total_cnt: 0,
+            suspend: false,
+            simtrade: false,
+        }
+    }
+}
+
+impl Default for TickFOPv1 {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            datetime: Utc::now(),
+            open: 0.0,
+            underlying_price: 0.0,
+            bid_side_total_vol: 0,
+            ask_side_total_vol: 0,
+            avg_price: 0.0,
+            close: 0.0,
+            high: 0.0,
+            low: 0.0,
+            amount: 0.0,
+            total_amount: 0.0,
+            volume: 0,
+            total_volume: 0,
+            tick_type: TickType::No,
+            chg_type: ChangeType::Unchanged,
+            price_chg: 0.0,
+            pct_chg: 0.0,
+            simtrade: false,
+        }
+    }
+}
+
+impl Default for BidAskSTKv1 {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            datetime: Utc::now(),
+            bid_price: vec![0.0; 5],
+            bid_volume: vec![0; 5],
+            diff_bid_vol: vec![0; 5],
+            ask_price: vec![0.0; 5],
+            ask_volume: vec![0; 5],
+            diff_ask_vol: vec![0; 5],
+            suspend: false,
+            simtrade: false,
+        }
+    }
+}
+
+impl Default for BidAskFOPv1 {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            datetime: Utc::now(),
+            underlying_price: 0.0,
+            bid_price: vec![0.0; 5],
+            bid_volume: vec![0; 5],
+            diff_bid_vol: vec![0; 5],
+            ask_price: vec![0.0; 5],
+            ask_volume: vec![0; 5],
+            diff_ask_vol: vec![0; 5],
+            simtrade: false,
+        }
+    }
+}
+
+impl Default for QuoteSTKv1 {
+    fn default() -> Self {
+        Self {
+            code: String::new(),
+            datetime: Utc::now(),
+            bid_price: 0.0,
+            bid_volume: 0,
+            ask_price: 0.0,
+            ask_volume: 0,
+            close: 0.0,
+            volume: 0,
+            amount: 0.0,
+            suspend: false,
+            simtrade: false,
+        }
+    }
+}

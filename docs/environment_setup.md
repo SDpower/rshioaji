@@ -13,6 +13,18 @@ SHIOAJI_SECRET_KEY=your_actual_secret_key_here
 SHIOAJI_SIMULATION=true
 ```
 
+### PyO3 橋接需求 (v0.4.6+)
+```bash
+# Python 版本 (建議 3.13+)
+PYTHON_VERSION=3.13
+
+# PyO3 Python 路徑 (可選，自動檢測)
+PYO3_PYTHON=python3.13
+
+# shioaji 套件安裝 (必須)
+# 請確保已安裝: pip install "shioaji[speed]"
+```
+
 ### 日誌設定（對應 Python utils.py）
 ```bash
 # 日誌等級，允許值: DEBUG, INFO, WARNING, ERROR, CRITICAL
@@ -45,10 +57,24 @@ RUST_LOG=info
 
 ## 🚀 使用方式
 
-### 1. 程式碼中使用
+### 1. PyO3 橋接環境準備
+
+```bash
+# 安裝系統 shioaji 套件 (必須)
+pip install "shioaji[speed]"
+
+# 驗證安裝
+python3 -c "import shioaji; print('shioaji version:', shioaji.__version__)"
+
+# 檢查 Python 版本 (建議 3.13+)
+python3 --version
+```
+
+### 2. 程式碼中使用
 
 ```rust
-use rshioaji::{EnvironmentConfig, init_logging};
+use rshioaji::{EnvironmentConfig, init_logging, Shioaji};
+use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -66,18 +92,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     log::info!("環境配置: {}", env_config.summary());
     
-    // 您的程式邏輯...
+    // 初始化 PyO3 橋接客戶端
+    let client = Shioaji::new(false, HashMap::new())?;
+    client.init().await?;
+    
+    // PyO3 橋接登入
+    let api_key = std::env::var("SHIOAJI_API_KEY")?;
+    let secret_key = std::env::var("SHIOAJI_SECRET_KEY")?;
+    let accounts = client.login(&api_key, &secret_key, true, 30, None, false, 30000).await?;
+    
+    log::info!("PyO3 橋接登入成功，帳戶數量: {}", accounts.len());
     
     Ok(())
 }
 ```
 
-### 2. 環境變數設定方式
+### 3. 環境變數設定方式
 
 #### 方法 A: 使用 .env 檔案
 ```bash
-# 建立 .env 檔案
+# 建立 .env 檔案 (包含 PyO3 橋接設定)
 cat > .env << EOF
+# API 設定
+SHIOAJI_API_KEY=your_actual_api_key
+SHIOAJI_SECRET_KEY=your_actual_secret_key
+SHIOAJI_SIMULATION=false
+
+# PyO3 橋接設定
+PYTHON_VERSION=3.13
+PYO3_PYTHON=python3.13
+
+# 日誌設定
 LOG_LEVEL=DEBUG
 SENTRY_URI=your_sentry_url
 LOG_SENTRY=True
@@ -89,15 +134,24 @@ EOF
 
 #### 方法 B: 直接設定環境變數
 ```bash
+# 設定 PyO3 橋接環境
+export PYTHON_VERSION=3.13
+export PYO3_PYTHON=python3.13
+
+# 設定日誌
 export LOG_LEVEL=DEBUG
 export SJ_LOG_PATH=debug.log
 export LOG_SENTRY=False
+
+# 執行範例
 cargo run --example basic_usage
 ```
 
 #### 方法 C: 在命令列中設定
 ```bash
-LOG_LEVEL=DEBUG SJ_LOG_PATH=debug.log cargo run --example basic_usage
+# 完整的 PyO3 橋接環境設定
+PYTHON_VERSION=3.13 PYO3_PYTHON=python3.13 LOG_LEVEL=DEBUG \
+cargo run --example test_complete_system
 ```
 
 ## 🛡️ Sentry 整合

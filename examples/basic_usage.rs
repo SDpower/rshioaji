@@ -1,66 +1,17 @@
-use rshioaji::{Shioaji, Exchange, Action, OrderType, StockPriceType, EnvironmentConfig, init_logging};
+use rshioaji::{Shioaji, Exchange, Action, OrderType, FuturesOrder, FuturesPriceType, FuturesOCType};
 use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 📚 前置作業：初始化環境配置和日誌系統
-    // 對應 Python shioaji utils.py 的功能
-    println!("🔧 正在初始化 rshioaji 環境...");
+    println!("🔧 Creating Shioaji instance...");
     
-    // 載入環境變數配置
-    let env_config = EnvironmentConfig::from_env();
-    if let Err(e) = env_config.validate() {
-        eprintln!("❌ 環境變數配置錯誤: {}", e);
-        return Ok(());
-    }
+    // Initialize environment
+    dotenvy::dotenv().ok();
+    env_logger::init();
     
-    println!("📋 環境配置: {}", env_config.summary());
-    
-    // 初始化日誌系統（對應 Python 的 log 設定）
-    if let Err(e) = init_logging(&env_config) {
-        eprintln!("❌ 日誌系統初始化失敗: {}", e);
-        // 使用基本的 env_logger 作為備用
-        env_logger::init();
-    }
-    
-    log::info!("🚀 rshioaji 環境初始化完成");
-    log::info!("📊 日誌等級: {}", env_config.log_level);
-    log::info!("🛡️  Sentry 錯誤追蹤: {}", if env_config.log_sentry { "啟用" } else { "停用" });
-    log::info!("📁 日誌檔案路徑: {}", env_config.sj_log_path);
-    log::info!("🧪 遺留測試模式: {}", env_config.legacy_test);
-    
-    // 顯示平台資訊
-    let platform = rshioaji::platform::Platform::detect();
-    log::info!("🖥️  偵測到的平台：{:?}", platform);
-    println!("🖥️  偵測到的平台：{:?}", platform);
-    
-    if let Some(platform_dir) = platform.directory_name() {
-        log::info!("📁 使用平台目錄：{}", platform_dir);
-        println!("📁 使用平台目錄：{}", platform_dir);
-        
-        // 驗證安裝
-        let base_path = std::env::current_dir()?;
-        match platform.validate_installation(&base_path) {
-            Ok(()) => {
-                log::info!("✅ 平台安裝驗證成功");
-                println!("✅ 平台安裝驗證成功");
-            },
-            Err(e) => {
-                log::error!("❌ 平台驗證失敗：{}", e);
-                println!("❌ 平台驗證失敗：{}", e);
-                println!("💡 請確保您的平台有正確的 shioaji 函式庫");
-                return Ok(());
-            }
-        }
-    } else {
-        log::error!("❌ 不支援的平台");
-        println!("❌ 不支援的平台");
-        return Ok(());
-    }
-    
-    // 建立 Shioaji 客戶端（模擬模式）
+    // 建立 Shioaji 客戶端（真實模式 - 符合純真實資料架構）
     let proxies = HashMap::new();
-    let client = Shioaji::new(true, proxies)?;
+    let client = Shioaji::new(false, proxies)?;
     
     // 初始化客戶端
     client.init().await?;
@@ -91,7 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   5️⃣  設定預設股票和期貨帳戶");
     
     // 步驟 1-5：呼叫 login 方法（內部會執行完整的登入流程）
-    let accounts = client.login(_api_key, _secret_key, true).await?;
+    let accounts = client.login_simple(_api_key, _secret_key, true).await?;
     log::info!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
     println!("✅ 登入成功！找到 {} 個帳戶", accounts.len());
     
@@ -161,57 +112,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     */
     
-    // 建立範例合約
-    log::info!("📈 建立範例合約...");
-    println!("\n📈 建立範例合約...");
+    // 建立範例合約 - 使用 TAIFEX TXFG5 期貨（目前有資料行情）
+    log::info!("📈 建立 TAIFEX TXFG5 期貨合約...");
+    println!("\n📈 建立 TAIFEX TXFG5 期貨合約...");
     
-    // 台積電 (2330)
-    let tsmc = client.create_stock("2330", Exchange::TSE);
-    let tsmc_msg = format!("建立台積電股票合約：{}", tsmc.contract.base.code);
-    log::info!("{}", tsmc_msg);
-    println!("{}", tsmc_msg);
+    // TAIFEX TXFG5 期貨（台灣期貨交易所，目前有資料行情）
+    let txfg5_future = client.create_future("TXFG5", Exchange::TAIFEX);
+    let txfg5_msg = format!("✅ 建立 TAIFEX TXFG5 期貨合約：{}", txfg5_future.contract.base.code);
+    log::info!("{}", txfg5_msg);
+    println!("{}", txfg5_msg);
     
-    // 台指期貨
-    let taiex_future = client.create_future("TXFA4");
-    let future_msg = format!("建立台指期貨合約：{}", taiex_future.contract.base.code);
-    log::info!("{}", future_msg);
-    println!("{}", future_msg);
+    // 顯示合約資訊
+    println!("📋 TXFG5 合約資訊：");
+    println!("   🏷️  商品代碼: {}", txfg5_future.contract.base.code);
+    println!("   🏛️  交易所: TAIFEX");
+    println!("   📊 合約類型: 期貨");
+    println!("   💹 目前有真實市場資料行情");
     
-    // 建立範例委託單（不會實際下單）
-    log::info!("📝 建立範例委託單...");
-    println!("\n📝 建立範例委託單...");
+    // 建立 TXFG5 期貨委託單範例（不會實際下單）
+    log::info!("📝 建立 TXFG5 期貨委託單範例...");
+    println!("\n📝 建立 TXFG5 期貨委託單範例...");
     
-    let stock_order = rshioaji::Order::new(
+    let txfg5_order = FuturesOrder::new(
         Action::Buy,
-        500.0,      // 價格：新台幣500元
-        1000,       // 數量：1張（1000股）
-        OrderType::ROD,
-        StockPriceType::LMT,
-    );
-    log::debug!("📦 股票委託單：{:?}", stock_order);
-    println!("📦 股票委託單：{:?}", stock_order);
-    
-    let futures_order = rshioaji::FuturesOrder::new(
-        Action::Buy,
-        17000.0,    // 價格
+        17000.0,    // 價格：17000點
         1,          // 數量：1口合約
         OrderType::ROD,
-        rshioaji::FuturesPriceType::LMT,
-        rshioaji::FuturesOCType::Auto,
+        FuturesPriceType::LMT,
+        FuturesOCType::Auto,
     );
-    log::debug!("🔮 期貨委託單：{:?}", futures_order);
-    println!("🔮 期貨委託單：{:?}", futures_order);
+    log::debug!("🔮 TXFG5 期貨委託單：{:?}", txfg5_order);
+    println!("🔮 TXFG5 期貨委託單：{:?}", txfg5_order);
     
-    // 展示市場資料訂閱（需要登入才能使用）
+    println!("📋 委託單詳細資訊：");
+    println!("   📈 動作: 買進");
+    println!("   💰 價格: 17000 點");
+    println!("   📊 數量: 1 口");
+    println!("   ⏰ 委託類型: ROD (當日有效)");
+    println!("   🎯 價格類型: 限價單");
+    
+    // 展示 TXFG5 期貨市場資料訂閱（需要登入才能使用）
     /*
-    log::info!("📡 訂閱市場資料...");
-    println!("\n📡 訂閱市場資料...");
-    if let Err(e) = client.subscribe(tsmc.contract.clone(), QuoteType::Tick).await {
-        log::warn!("⚠️  市場資料訂閱失敗：{}", e);
-        println!("⚠️  市場資料訂閱失敗：{}", e);
+    log::info!("📡 訂閱 TXFG5 期貨市場資料...");
+    println!("\n📡 訂閱 TXFG5 期貨市場資料...");
+    if let Err(e) = client.subscribe(txfg5_future.contract.clone(), "tick").await {
+        log::warn!("⚠️  TXFG5 期貨市場資料訂閱失敗：{}", e);
+        println!("⚠️  TXFG5 期貨市場資料訂閱失敗：{}", e);
     } else {
-        log::info!("✅ 已訂閱台積電即時報價");
-        println!("✅ 已訂閱台積電即時報價");
+        log::info!("✅ 已訂閱 TXFG5 期貨即時報價");
+        println!("✅ 已訂閱 TXFG5 期貨即時報價");
     }
     
     // 取得歷史資料
@@ -267,7 +216,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   6️⃣  設定預設期貨帳戶 (futopt_account)");
     println!("   7️⃣  準備就緒，可以開始交易");
     
-    log::info!("範例執行完成，日誌已記錄到：{}", env_config.sj_log_path);
+    log::info!("範例執行完成");
     
     Ok(())
 }

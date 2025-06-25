@@ -17,9 +17,9 @@
 ## 特點
 
 - 🚀 **高效能**：基於 Rust 實現，提供優秀的執行效能和記憶體安全
-- 🔗 **相容性**：使用原始 Python C 擴展 (.so 檔案)，確保完整功能相容性
+- 🔗 **相容性**：直接使用系統安裝的 Python shioaji，確保完整功能相容性
 - 🌐 **多平台支援**：支援 macOS ARM64 和 Linux x86_64 平台
-- 📦 **靜態連結**：支援將 .so 檔案內嵌至執行檔，無運行時依賴
+- 📦 **純系統整合**：無需嵌入 .so 檔案，直接使用 pip install shioaji
 - 🐳 **容器化**：提供 Docker 支援，便於部署和分發
 - ⚡ **非同步**：基於 tokio 實現非同步操作
 - 🛡️ **型別安全**：完整的 Rust 型別定義，編譯時錯誤檢查
@@ -38,13 +38,13 @@
 ```toml
 [dependencies]
 # 基本版本
-rshioaji = "0.2.0"
+rshioaji = "0.4.6"
 
 # 啟用高效能功能 (推薦)
-rshioaji = { version = "0.2.0", features = ["speed"] }
+rshioaji = { version = "0.4.6", features = ["speed"] }
 
 # 啟用所有功能 + 事件回調
-rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
+rshioaji = { version = "0.4.6", features = ["speed"] }
 ```
 
 ### 可用功能 (Features)
@@ -52,10 +52,19 @@ rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
 | 功能 | 描述 | 用途 |
 |------|------|------|
 | `speed` | 🚀 高效能時間處理 | 等效於 Python `shioaji[speed]`，提升日期時間處理效能 |
-| `static-link` | 📦 靜態連結 | 將 .so 檔案內嵌到執行檔，無運行時依賴 |
 | `sentry` | 🔍 Sentry 錯誤追蹤 | 支援 Sentry 錯誤監控和追蹤功能 |
 
-## 🎯 新功能 v0.2.0 - 事件回調系統
+## 🎯 新功能 v0.4.6 - 完整實現市場資料訂閱與回調系統
+
+### 重大變更說明 (從 v0.2.0 跳躍至 v0.4.6)
+
+由於 v0.2.0 版本在功能實現上存在問題，我們進行了大幅度的架構重構和功能完善：
+
+- **❌ v0.2.0 問題**：回調系統未完全實現，市場資料訂閱存在問題
+- **✅ v0.4.6 成果**：完整實現 Python → Rust 回調轉發，成功接收真實市場資料
+- **🚀 跳躍版本**：反映重大架構改進和功能完整性
+
+### v0.4.6 核心功能
 
 ### 支援的回調類型
 
@@ -75,6 +84,32 @@ rshioaji = { version = "0.2.0", features = ["speed", "static-link"] }
 - 🛡️ **線程安全**：支援多線程環境下的安全事件分發
 - 🎯 **靈活組合**：可選擇性實作需要的回調介面
 
+### 🔧 合約存取架構改進 (2025-06-25)
+
+#### 重要變更：`get_system_contract` 方法
+
+- **方法重新命名**：`create_system_contract` → `get_system_contract`
+- **語意更準確**：反映實際功能（取得現有合約，而非建立新合約）
+- **架構對齊**：與 Python shioaji 的 `api.Contracts.Stocks["2330"]` 模式一致
+
+#### 新增安全檢查
+
+- **必要條件**：使用前必須先呼叫 `login()` 方法
+- **錯誤處理**：未登入時回傳清楚的錯誤訊息
+- **安全性**：防止在未認證狀態下存取合約資料
+
+```rust
+// ❌ 錯誤用法：未登入就嘗試存取合約
+let client = Shioaji::new(false, HashMap::new())?;
+client.place_order(contract, order).await?; // 會失敗並提示需要登入
+
+// ✅ 正確用法：先登入再存取合約
+let client = Shioaji::new(false, HashMap::new())?;
+client.init().await?;
+client.login(&api_key, &secret_key, true, 30, None, false, 30000).await?;
+client.place_order(contract, order).await?; // 成功，取得真實 Python 合約實例
+```
+
 ### 編譯選項
 
 ```bash
@@ -85,7 +120,7 @@ cargo build
 cargo build --features speed
 
 # 生產環境編譯 (推薦)
-cargo build --release --features "speed,static-link"
+cargo build --release --features speed
 ```
 
 ## 支援平台
@@ -97,8 +132,8 @@ cargo build --release --features "speed,static-link"
 
 ### 系統需求
 - Rust 1.75+
-- Python 3.12+ (完整支援並測試驗證)
-- 對應平台的 shioaji C 擴展檔案
+- Python 3.13+ (完整支援並測試驗證)
+- 系統安裝的 shioaji 套件：`pip install shioaji`
 
 ### 開發依賴
 - PyO3 0.20+
@@ -119,50 +154,73 @@ cd my-trading-app
 
 ```toml
 [dependencies]
-rshioaji = { version = "0.2.0", features = ["speed"] }
+rshioaji = { version = "0.4.6", features = ["speed"] }
 tokio = { version = "1.0", features = ["full"] }
 ```
 
 ### 2. 基本使用範例
 
 ```rust
-use rshioaji::{Shioaji, Config, Exchange, QuoteType, EnvironmentConfig, init_logging};
+use rshioaji::{Shioaji, Exchange, Action, OrderType, Order, StockPriceType};
 use std::collections::HashMap;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // 📚 前置作業：初始化環境配置和日誌系統
-    let env_config = EnvironmentConfig::from_env();
-    if let Err(e) = env_config.validate() {
-        eprintln!("環境變數配置錯誤: {}", e);
-        return Ok(());
-    }
-    
-    // 初始化日誌系統（對應 Python utils.py）
-    init_logging(&env_config)?;
-    log::info!("🚀 rshioaji 環境初始化完成");
-    
-    // 從環境變數載入配置
-    let config = Config::from_env()?;
+    // 初始化環境
+    dotenvy::dotenv().ok();
+    env_logger::init();
     
     // 創建客戶端
-    let client = Shioaji::new(config.simulation, HashMap::new())?;
+    let client = Shioaji::new(false, HashMap::new())?; // false = 真實模式
     client.init().await?;
     
-    // 🔑 完整登入流程（包含錯誤追蹤、合約下載、預設帳戶設定）
-    let accounts = client.login(&config.api_key, &config.secret_key, true).await?;
-    log::info!("登入成功！帳戶數量: {}", accounts.len());
+    // 🔑 重要：必須先登入才能存取合約
+    // get_system_contract 方法會檢查登入狀態
+    let api_key = std::env::var("SHIOAJI_API_KEY")?;
+    let secret_key = std::env::var("SHIOAJI_SECRET_KEY")?;
     
-    // 創建股票合約並訂閱
+    let accounts = client.login(
+        &api_key, 
+        &secret_key, 
+        true,    // fetch_contract: 下載合約資料
+        30,      // contracts_timeout
+        None,    // contracts_cb
+        false,   // subscribe_trade
+        30000    // receive_window
+    ).await?;
+    
+    println!("✅ 登入成功！帳戶數量: {}", accounts.len());
+    
+    // ✅ 登入後可以安全存取合約
+    // get_system_contract 會從 api.Contracts.Stocks["2330"] 取得真實 Python 實例
     let stock = client.create_stock("2330", Exchange::TSE);
-    client.subscribe(stock.contract.clone(), QuoteType::Tick).await?;
+    let order = Order::new(Action::Buy, 500.0, 1000, OrderType::ROD, StockPriceType::LMT);
     
-    // 取得歷史資料
-    let kbars = client.kbars(stock.contract, "2024-01-01", "2024-01-31").await?;
-    log::info!("取得 {} 筆 K 線資料", kbars.data.len());
+    match client.place_order(stock.contract, order).await {
+        Ok(trade) => println!("下單成功！交易 ID: {}", trade.order_id),
+        Err(e) => println!("下單失敗：{}", e),
+    }
+    
+    // 登出
+    client.logout().await?;
     
     Ok(())
 }
+```
+
+#### 🛡️ 安全檢查重點
+
+```rust
+// ❌ 錯誤：未登入就嘗試下單
+let client = Shioaji::new(false, HashMap::new())?;
+client.place_order(contract, order).await?; 
+// Error: "Must login first before accessing contracts. Please call login() method."
+
+// ✅ 正確：先登入再操作
+let client = Shioaji::new(false, HashMap::new())?;
+client.init().await?;
+client.login(&api_key, &secret_key, true, 30, None, false, 30000).await?;
+client.place_order(contract, order).await?; // 成功
 ```
 
 ### 3. 事件回調系統範例 (新功能)
@@ -245,26 +303,11 @@ cd rshioaji
 cargo build --release
 ```
 
-#### 靜態連結編譯（推薦）
-```bash
-cargo build --release --features static-link
-```
-
-#### 高效能編譯（包含速度優化）
+#### 高效能編譯（推薦）
 ```bash
 # 啟用 speed 功能，等效於 shioaji[speed]
 cargo build --release --features speed
-
-# 結合靜態連結和速度優化
-cargo build --release --features "static-link,speed"
 ```
-
-**靜態連結優勢**：
-- 🔗 所有 .so 檔案內嵌於執行檔中
-- 📦 單一執行檔，無外部依賴
-- 🚀 更快的啟動時間
-- 🛡️ 提升安全性，減少攻擊面
-- 📋 便於分發和部署
 
 **Speed 功能優勢**：
 - ⚡ 快速日期時間處理（等效於 ciso8601）
@@ -291,6 +334,10 @@ RUST_LOG=info
 - `SHIOAJI_SECRET_KEY` 或 `SECRET_KEY` - 密鑰
 - `SHIOAJI_SIMULATION` 或 `SIMULATION` - 模擬模式 (true/false)
 
+##### 系統需求
+- **必要**: 系統安裝的 shioaji 套件：`pip install shioaji`
+- **檢查**: 確認 Python 可以正確導入 shioaji 模組
+
 ##### 日誌設定 (對應 Python utils.py)
 - `LOG_LEVEL` - 日誌等級 (DEBUG/INFO/WARNING/ERROR/CRITICAL)
 - `SJ_LOG_PATH` - 日誌檔案路徑 (設為 "console" 只輸出到控制台)
@@ -314,7 +361,7 @@ cargo run
 cargo run --features speed
 
 # 生產環境執行
-cargo run --release --features "speed,static-link"
+cargo run --release --features speed
 ```
 
 ## 📚 使用範例
@@ -379,7 +426,7 @@ cargo build --bin rshioaji-cli --release
 # Linux x86_64 平台（推薦生產環境 - 162MB）
 ./docker-build.sh linux
 
-# Python 3.12 原生支援版本（173MB）
+# Python 3.13 原生支援版本（200MB）
 docker build -t rshioaji:python312 -f Dockerfile.python .
 
 # Alpine Linux（超輕量版本 - 50MB）
@@ -390,7 +437,7 @@ docker build -t rshioaji:python312 -f Dockerfile.python .
 
 # 手動建置
 docker build -t rshioaji:latest .                    # 輕量版 162MB (Python 3.11)
-docker build -t rshioaji:python312 -f Dockerfile.python . # Python 3.12 173MB
+docker build -t rshioaji:python313 -f Dockerfile.python . # Python 3.13 200MB
 docker build -t rshioaji:alpine -f Dockerfile.alpine . # 超輕量 50MB
 docker build -t rshioaji:macos -f Dockerfile.macos .   # macOS ARM64
 ```
@@ -398,41 +445,41 @@ docker build -t rshioaji:macos -f Dockerfile.macos .   # macOS ARM64
 ### 執行容器
 
 ```bash
-# 使用 .env 檔案執行（推薦 - Python 3.12）
-docker run --rm -v $(pwd)/.env:/app/.env:ro rshioaji:python312 --stock 2330
+# 使用 .env 檔案執行（推薦 - Python 3.13）
+docker run --rm -v $(pwd)/.env:/app/.env:ro rshioaji:python313 --stock 2330
 
 # 使用 .env 檔案執行（Python 3.11 輕量版）
 docker run --rm -v $(pwd)/.env:/app/.env:ro rshioaji:latest --stock 2330
 
-# 使用環境變數執行（Python 3.12）
+# 使用環境變數執行（Python 3.13）
 docker run --rm \
   -e SHIOAJI_API_KEY=your_key \
   -e SHIOAJI_SECRET_KEY=your_secret \
   -e SHIOAJI_SIMULATION=false \
-  rshioaji:python312 --stock 2330 --debug
+  rshioaji:python313 --stock 2330 --debug
 
 # Alpine 超輕量版本
 docker run --rm -v $(pwd)/.env:/app/.env:ro rshioaji:alpine --stock 2330
 
-# 互動模式（Python 3.12）
-docker run --rm -it -v $(pwd)/.env:/app/.env:ro rshioaji:python312 bash
+# 互動模式（Python 3.13）
+docker run --rm -it -v $(pwd)/.env:/app/.env:ro rshioaji:python313 bash
 
 # 背景執行（Python 3.12）
 docker run -d --name rshioaji-trader \
   -v $(pwd)/.env:/app/.env:ro \
-  rshioaji:python312 --stock 2330 --debug
+  rshioaji:python313 --stock 2330 --debug
 ```
 
 ### Docker Compose 部署
 
-創建 `docker-compose.yml`（Python 3.12 版本）：
+創建 `docker-compose.yml`（Python 3.13 版本）：
 ```yaml
 version: '3.8'
 services:
   rshioaji:
     build:
       context: .
-      dockerfile: Dockerfile.python  # 使用 Python 3.12
+      dockerfile: Dockerfile.python  # 使用 Python 3.13
     env_file:
       - .env
     command: ["--stock", "2330", "--debug"]
@@ -446,7 +493,7 @@ services:
 version: '3.8'
 services:
   rshioaji:
-    image: rshioaji:python312
+    image: rshioaji:python313
     env_file:
       - .env
     command: ["--stock", "2330", "--debug"]
@@ -463,9 +510,9 @@ docker-compose logs -f rshioaji
 
 ### Docker 特點
 
-- 🏔️ **超輕量設計**：173MB Python 3.12 | 162MB 輕量版 | 50MB 超輕量版 (減少 91.3% 大小)
+- 🏔️ **超輕量設計**：200MB Python 3.13 | 180MB 輕量版 | 70MB 超輕量版 (減少 88% 大小)
 - 🐧 **多平台支援**：Linux x86_64、Alpine Linux 和 macOS ARM64
-- 🐍 **Python 3.12**：原生支援 Python 3.12 和完整 C 擴展整合 (推薦)
+- 🐍 **Python 3.13**：原生支援 Python 3.13 和 PyO3 橋接整合 (推薦)
 - 📦 **多階段建置**：分離編譯環境與運行環境，大幅減少映像檔大小
 - 🔐 **安全配置**：支援 .env 檔案和環境變數，API 憑證自動遮罩
 - ⚡ **快速部署**：一鍵建置與執行，容器啟動速度快
@@ -475,10 +522,10 @@ docker-compose logs -f rshioaji
 ### 映像檔大小對比
 | 版本 | 大小 | 用途 | Python 支援 |
 |------|------|------|-------------|
-| rshioaji:python312 | 173MB | **Python 3.12 推薦** | ✅ 原生 3.12 支援 |
-| rshioaji:latest | 162MB | Python 3.11 輕量版 | ✅ 完整支援 |
-| rshioaji:alpine | 50MB | 資源受限環境 | ⚠️ 基本支援 |
-| rshioaji:macos | 100MB | 開發環境 | ✅ 完整支援 |
+| rshioaji:python313 | 200MB | **Python 3.13 推薦** | ✅ 原生 3.13 支援 |
+| rshioaji:latest | 180MB | Python 3.13 輕量版 | ✅ 完整支援 |
+| rshioaji:alpine | 70MB | 資源受限環境 | ⚠️ 基本支援 |
+| rshioaji:macos | 120MB | 開發環境 | ✅ 完整支援 |
 
 ## 🔧 環境變數配置
 
@@ -553,6 +600,7 @@ LOG_SENTRY=True SENTRY_URI=your_sentry_dsn cargo run --features sentry
 
 - **[環境設定指南](docs/environment_setup.md)** - 完整的環境變數配置說明
 - **[登入流程說明](docs/login_flow.md)** - 標準登入流程詳細解析
+- **[回調系統使用指南](docs/callback_usage.md)** - 完整的事件回調系統使用說明
 - **[代碼品質指南](docs/linting_guide.md)** - Clippy 和代碼品質檢查
 - **[更新日誌](CHANGELOG.md)** - 版本更新記錄
 
@@ -617,9 +665,6 @@ rshioaji/
 │   ├── platform.rs        # 平台檢測邏輯
 │   ├── error.rs           # 錯誤處理
 │   └── types/             # 型別定義
-├── lib/shioaji/           # Python C 擴展檔案
-│   ├── macosx_arm/        # macOS ARM64 版本
-│   └── manylinux_x86_64/  # Linux x86_64 版本
 ├── examples/              # 範例程式
 ├── tests/                 # 測試檔案
 ├── Dockerfile             # Docker 配置
@@ -629,7 +674,7 @@ rshioaji/
 
 ## 平台檢測
 
-rshioaji 會自動檢測執行平台並載入對應的 C 擴展檔案：
+rshioaji 會自動檢測執行平台並確認系統 shioaji 安裝：
 
 ```rust
 use rshioaji::platform::Platform;
@@ -637,35 +682,33 @@ use rshioaji::platform::Platform;
 let platform = Platform::detect();
 println!("檢測到平台: {:?}", platform);
 
-// 驗證安裝
-let base_path = std::env::current_dir()?;
-platform.validate_installation(&base_path)?;
+// 驗證系統 shioaji 安裝
+platform.validate_system_shioaji()?;
 ```
 
 ## 環境設定
 
-### 動態連結版本
+### 系統要求
 
-#### macOS ARM64
+#### 安裝系統 shioaji
 ```bash
-export DYLD_LIBRARY_PATH=/path/to/lib/shioaji/macosx_arm/backend:/path/to/lib/shioaji/macosx_arm/backend/solace
+# 安裝 Python shioaji 套件
+pip install shioaji
+
+# 驗證安裝
+python3 -c "import shioaji; print('✅ 系統 shioaji 安裝成功')"
 ```
 
-#### Linux x86_64
-```bash
-export LD_LIBRARY_PATH=/path/to/lib/shioaji/manylinux_x86_64/backend:/path/to/lib/shioaji/manylinux_x86_64/backend/solace
-```
+### 純系統整合
 
-### 靜態連結版本
-
-靜態連結版本無需設定環境變數，可直接執行：
+v0.2.0+ 使用純系統 shioaji 整合，無需設定環境變數：
 
 ```bash
-# 直接執行，無需額外設定
+# 直接執行，自動檢測系統 shioaji
 ./target/release/rshioaji-cli
 
 # 或使用 cargo
-cargo run --release --features static-link
+cargo run --release --features speed
 ```
 
 ## 除錯
@@ -676,28 +719,29 @@ export RUST_LOG=debug
 cargo run --example simple_test
 ```
 
-### 檢查平台檔案
+### 檢查系統安裝
 ```bash
-# 確認 .so 檔案存在
-ls -la lib/shioaji/*/backend/solace/*.so
+# 確認系統 shioaji 安裝
+python3 -c "import shioaji; s=shioaji.Shioaji(); print('✅ 系統 shioaji 正常')"
 
-# 檢查檔案權限
-chmod +x lib/shioaji/*/backend/solace/*.so
+# 檢查 Python 環境
+which python3
+python3 --version
 ```
 
 ## 常見問題
 
 ### Q: 出現 "Platform validation failed" 錯誤
-A: 請確認對應平台的 .so 檔案存在且有執行權限。
+A: 請確認系統已安裝 shioaji：`pip install shioaji`，並確認可以正常導入。
 
 ### Q: Docker 容器無法啟動
 A: 確認使用正確的 Dockerfile（Linux 用 Dockerfile，macOS 用 Dockerfile.macos）。
 
-### Q: Python 3.12 模組載入錯誤
-A: 確認 lib/shioaji 目錄下的 .so 檔案為 cpython-312 版本。
+### Q: Python 3.13 模組載入錯誤
+A: 確認系統 Python 環境正確且已安裝 shioaji：`pip install shioaji`。
 
 ### Q: Python 模組匯入錯誤
-A: 檢查 PYTHONPATH 和 LD_LIBRARY_PATH 環境變數設定，確認 Python 3.12 環境正確。
+A: 檢查系統 Python 環境，確認 shioaji 正確安裝：`python3 -c "import shioaji"`。
 
 ## 授權
 
@@ -720,11 +764,8 @@ A: 檢查 PYTHONPATH 和 LD_LIBRARY_PATH 環境變數設定，確認 Python 3.12
 # 啟用高效能模式 (推薦生產環境)
 cargo build --release --features speed
 
-# 啟用靜態連結 (單一執行檔)
-cargo build --release --features static-link
-
-# 同時啟用多個功能
-cargo build --release --features "speed,static-link"
+# 基本編譯 (純系統整合)
+cargo build --release
 ```
 
 ### 效能優化
@@ -757,7 +798,7 @@ cargo build --release --features "speed,static-link"
 cargo new test-rshioaji && cd test-rshioaji
 
 # 添加依賴
-echo 'rshioaji = { version = "0.2.0", features = ["speed"] }' >> Cargo.toml
+echo 'rshioaji = { version = "0.4.6", features = ["speed"] }' >> Cargo.toml
 
 # 編譯測試
 cargo build
@@ -774,10 +815,10 @@ cargo build
 
 ```toml
 [dependencies]
-rshioaji = "0.2.0"  # 最新版本 (支援事件回調)
+rshioaji = "0.4.6"  # 最新版本 (支援事件回調)
 ```
 
-- **版本**: 0.2.0
+- **版本**: 0.4.6
 - **授權**: MIT OR Apache-2.0
 - **平台**: macOS ARM64, Linux x86_64  
 - **Rust 版本**: 1.75+

@@ -44,7 +44,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             
             // Login using the configuration
             println!("🔐 Logging in with environment credentials...");
-            match client.login(&config.api_key, &config.secret_key, true).await {
+            match client.login_simple(&config.api_key, &config.secret_key, true).await {
                 Ok(accounts) => {
                     println!("✅ Login successful! Found {} accounts", accounts.len());
                     
@@ -59,28 +59,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!();
                     println!("📈 Testing basic functionality...");
                     
-                    // Create a stock contract
-                    let tsmc = client.create_stock("2330", Exchange::TSE);
-                    println!("📊 Created contract for TSMC (2330): {:?}", tsmc.contract);
+                    // Create a TXFG5 futures contract
+                    let txfg5_future = client.create_future("TXFG5", Exchange::TAIFEX);
+                    println!("📊 Created contract for TXFG5 future: {:?}", txfg5_future.contract);
                     
                     // Try to subscribe to market data
-                    if let Err(e) = client.subscribe(tsmc.contract.clone(), rshioaji::QuoteType::Tick).await {
+                    if let Err(e) = client.subscribe(txfg5_future.contract.clone(), "tick").await {
                         println!("⚠️  Market data subscription failed (expected in demo): {}", e);
                     }
                     
-                    // List all accounts
-                    let all_accounts = client.list_accounts().await?;
-                    println!("📋 Total accounts available: {}", all_accounts.len());
+                    // Check login status
+                    let logged_in = client.is_logged_in().await;
+                    println!("📋 Login status: {}", if logged_in { "Logged in" } else { "Not logged in" });
                     
-                    // Logout
+                    // Show current functionality
                     println!();
-                    println!("🔒 Logging out...");
-                    let logout_success = client.logout().await?;
-                    if logout_success {
-                        println!("✅ Logout successful");
-                    } else {
-                        println!("⚠️  Logout may have failed");
-                    }
+                    println!("🎉 Environment configuration example completed successfully!");
                 }
                 Err(e) => {
                     println!("❌ Login failed: {}", e);

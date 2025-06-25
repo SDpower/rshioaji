@@ -2,7 +2,105 @@
 
 本文件記錄 rshioaji 專案的重要變更。
 
-## [v0.2.0] - 2024-06-16
+## [v0.4.6] - 2025-06-26
+
+### 🚨 重大版本跳躍說明
+
+由於 v0.2.0 版本在功能實現上存在重大問題，我們進行了大幅度的架構重構。為了反映這些重大改進，版本直接從 v0.2.0 跳躍至 v0.4.6。
+
+### ✅ 新增功能
+
+#### 🎯 完整實現市場資料訂閱系統
+- **真實市場資料訂閱**：成功實現 MXFG5 期貨合約訂閱
+- **Python → Rust 回調轉發**：完整的事件轉發機制
+- **系統事件監控**：正確的訂閱確認事件 (TIC/v1/FOP/*/TFE/MXFG5)
+
+#### 📡 回調系統重構
+- **事件轉發機制**：Python shioaji 事件正確轉發至 Rust 回調
+- **回調註冊修復**：使用正確的 `quote.set_event_callback` 方法
+- **系統事件回調**：成功接收 `Response Code: 200 16` 系統事件
+
+#### 🔧 訂閱機制修復
+- **合約存取修正**：正確實現 `api.Contracts.Futures.MXF["MXFG5"]` 模式
+- **PyO3 API 修正**：使用 `__getitem__` 方法進行 Python 索引存取
+- **錯誤處理改進**：完整的錯誤訊息和狀態檢查
+
+#### 📊 測試與範例改進
+- **test_complete_system**：新增 30 秒市場資料觀察期
+- **回調格式標準化**：按照 Python 範例的輸出格式
+- **範例清理**：移除無法工作的測試範例
+
+### 🔧 修復問題
+
+#### ❌ v0.2.0 已知問題修復
+- **回調系統未觸發**：修復 Python → Rust 事件轉發
+- **訂閱失敗**：修復 `'Shioaji' object cannot be converted to 'PyDict'` 錯誤
+- **錯誤的回調註冊**：從字典操作改為真實 shioaji API 調用
+
+#### 🏗️ 架構改進
+- **純系統 shioaji 整合**：移除不必要的複雜包裝層
+- **回調轉發鏈**：Python 回調 → Rust EventHandlers → 用戶回調
+- **合約存取安全**：強制登入狀態檢查
+
+### 📋 移除的內容
+
+#### 🧹 清理無效範例
+移除以下無法工作或過時的範例：
+- `test_login.rs` - Platform 方法不存在
+- `test_simulate_callback_trigger.rs` - 模擬回調（違反真實資料原則）
+- `test_rust_callback_trigger.rs` - 手動觸發（不符合實際使用）
+- `test_callbacks_trigger.rs` - 測試觸發機制（已整合到主系統）
+- `test_direct_callback.rs` - 直接回調測試（已移至整合測試）
+- `test_final_callback_verification.rs` - 最終驗證（已整合）
+- `test_python_placeholder.rs` - Python 佔位符（已實現真實功能）
+- `test_python_stdout.rs` - Python 輸出測試（已整合）
+- `test_minimal_pyo3.rs` - 最小 PyO3 測試（已整合）
+
+### 🎯 保留的核心範例
+
+#### ✅ 生產就緒範例
+- `test_complete_system.rs` - **完整系統測試**（推薦使用）
+- `basic_usage.rs` - 基本使用示範
+- `callback_example.rs` - 回調系統示範
+- `complete_login_example.rs` - 完整登入流程
+- `contract_access_example.rs` - 合約存取示範
+- `env_config_example.rs` - 環境配置示範
+- `test_callback_mechanism.rs` - 回調機制驗證
+- `test_callbacks_basic.rs` - 基本回調測試
+- `test_login_system.rs` - 登入系統測試
+
+### 📈 性能與穩定性
+
+#### 🚀 驗證成果
+- **真實市場資料**：成功接收 MXFG5 期貨 tick 資料
+- **系統穩定性**：30 秒持續觀察無錯誤
+- **回調性能**：零延遲事件轉發
+- **編譯穩定性**：所有保留範例編譯通過
+
+### 🔮 後續計劃
+
+#### 📋 下一版本規劃
+- 更多市場資料類型支援（股票、選擇權）
+- 訂單管理系統完善
+- 效能監控和指標收集
+- Windows 平台支援
+
+---
+
+## [v0.2.0] - 2025-06-25 (已廢棄)
+
+### ⚠️ 版本狀態：已廢棄
+
+此版本存在重大功能問題，已被 v0.4.5 完全取代。
+
+#### 已知問題
+- 回調系統未完全實現
+- 市場資料訂閱機制有缺陷
+- Python → Rust 事件轉發不完整
+
+---
+
+## [v0.2.0 原始記錄] - 2024-06-16
 
 ### 🚀 新功能 (Added)
 

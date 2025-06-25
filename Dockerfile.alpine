@@ -1,13 +1,17 @@
 # Ultra-lightweight Alpine Linux build for rshioaji
 FROM rust:1.75-alpine as builder
 
-# Install Alpine build dependencies
+# Install Alpine build dependencies for PyO3 bridge
 RUN apk add --no-cache \
     musl-dev \
     openssl-dev \
     pkgconfig \
     python3-dev \
+    py3-pip \
     build-base
+
+# Install shioaji[speed] for PyO3 bridge integration
+RUN pip3 install --no-cache-dir "shioaji[speed]"
 
 WORKDIR /app
 
@@ -29,12 +33,17 @@ RUN ./target/release/rshioaji-cli --help
 # Final runtime image - minimal Alpine
 FROM alpine:3.19
 
-# Install minimal runtime dependencies
+# Install minimal runtime dependencies including Python for PyO3 bridge
 RUN apk add --no-cache \
     ca-certificates \
     libgcc \
+    python3 \
+    py3-pip \
     && addgroup -g 1000 rshioaji \
     && adduser -D -s /bin/sh -u 1000 -G rshioaji rshioaji
+
+# Install shioaji[speed] for runtime PyO3 bridge
+RUN pip3 install --no-cache-dir "shioaji[speed]"
 
 WORKDIR /app
 

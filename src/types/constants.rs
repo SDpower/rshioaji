@@ -34,6 +34,20 @@ impl std::fmt::Display for Exchange {
     }
 }
 
+impl std::str::FromStr for Exchange {
+    type Err = String;
+    
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "TSE" => Ok(Exchange::TSE),
+            "OTC" => Ok(Exchange::OTC),
+            "OES" => Ok(Exchange::OES),
+            "TAIFEX" => Ok(Exchange::TAIFEX),
+            _ => Err(format!("Unknown exchange: {}", s))
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SecurityType {
     Index, // 指數
@@ -187,4 +201,12 @@ pub enum ChangeType {
     Unchanged, // 平盤
     Down,      // 跌
     LimitDown, // 跌停
+}
+
+/// 合約獲取狀態 (對應原始 Python 的 FetchStatus)
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum FetchStatus {
+    Unfetch,  // 未獲取
+    Fetching, // 獲取中
+    Fetched,  // 已獲取
 }

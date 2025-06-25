@@ -10,7 +10,7 @@
 //! - ⚡ **Async Support**: Built on tokio for async operations
 //! - 🛡️ **Type Safety**: Complete Rust type definitions with compile-time checks
 //! 
-//! ## Version 0.2.0 - Event Callback System
+//! ## Version 0.4.6 - Event Callback System
 //! 
 //! This version introduces a comprehensive event callback system with native Rust traits:
 //! 

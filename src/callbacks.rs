@@ -1,6 +1,11 @@
 use std::sync::Arc;
-use crate::types::{Exchange, TickSTKv1, TickFOPv1, BidAskSTKv1, BidAskFOPv1, QuoteSTKv1};
+use crate::types::{Exchange, TickSTKv1, TickFOPv1, BidAskSTKv1, BidAskFOPv1, QuoteSTKv1, SecurityType};
 use crate::types::orders::OrderState;
+
+/// Type alias for event closure to reduce complexity
+type EventClosure = Arc<dyn Fn(i32, i32, String, String) + Send + Sync>;
+/// Type alias for session down closure
+type SessionDownClosure = Arc<dyn Fn() + Send + Sync>;
 
 /// Trait for handling market data tick events
 pub trait TickCallback: Send + Sync {
@@ -44,6 +49,21 @@ pub trait SystemCallback: Send + Sync {
     fn on_session_down(&self);
 }
 
+/// Trait for handling contract fetch events (對應原始 Python 的 contracts_cb)
+/// 
+/// 對應原始 Python 函數簽名：
+/// ```python
+/// contracts_cb: typing.Callable[[SecurityType], None] = None
+/// ```
+pub trait ContractCallback: Send + Sync {
+    /// Called when contracts of a specific security type are fetched
+    /// 對應原始 Python: contracts_cb(securitytype)
+    fn on_contracts_fetched(&self, security_type: SecurityType);
+    
+    /// Called when all contracts fetch is completed
+    fn on_all_contracts_fetched(&self);
+}
+
 /// Event handler registry that manages all callback types
 pub struct EventHandlers {
     tick_callbacks: Vec<Arc<dyn TickCallback>>,
@@ -51,6 +71,10 @@ pub struct EventHandlers {
     quote_callbacks: Vec<Arc<dyn QuoteCallback>>,
     order_callbacks: Vec<Arc<dyn OrderCallback>>,
     system_callbacks: Vec<Arc<dyn SystemCallback>>,
+    contract_callbacks: Vec<Arc<dyn ContractCallback>>,
+    // Direct function closures for flexibility
+    event_closures: Vec<EventClosure>,
+    session_down_closures: Vec<SessionDownClosure>,
 }
 
 impl EventHandlers {
@@ -61,6 +85,9 @@ impl EventHandlers {
             quote_callbacks: Vec::new(),
             order_callbacks: Vec::new(),
             system_callbacks: Vec::new(),
+            contract_callbacks: Vec::new(),
+            event_closures: Vec::new(),
+            session_down_closures: Vec::new(),
         }
     }
     
@@ -87,6 +114,21 @@ impl EventHandlers {
     /// Register a system callback handler
     pub fn register_system_callback(&mut self, callback: Arc<dyn SystemCallback>) {
         self.system_callbacks.push(callback);
+    }
+    
+    /// Register a contract callback handler
+    pub fn register_contract_callback(&mut self, callback: Arc<dyn ContractCallback>) {
+        self.contract_callbacks.push(callback);
+    }
+    
+    /// Register an event closure (for direct function callbacks)
+    pub fn register_event_closure(&mut self, callback: Arc<dyn Fn(i32, i32, String, String) + Send + Sync>) {
+        self.event_closures.push(callback);
+    }
+    
+    /// Register a session down closure (for direct function callbacks)
+    pub fn register_session_down_closure(&mut self, callback: Arc<dyn Fn() + Send + Sync>) {
+        self.session_down_closures.push(callback);
     }
     
     /// Trigger stock tick callbacks
@@ -143,12 +185,32 @@ impl EventHandlers {
         for callback in &self.system_callbacks {
             callback.on_event(event_type, code, message.clone(), details.clone());
         }
+        for closure in &self.event_closures {
+            closure(event_type, code, message.clone(), details.clone());
+        }
     }
     
     /// Trigger session down callbacks
     pub fn trigger_session_down(&self) {
         for callback in &self.system_callbacks {
             callback.on_session_down();
+        }
+        for closure in &self.session_down_closures {
+            closure();
+        }
+    }
+    
+    /// Trigger contract fetched callbacks for specific security type
+    pub fn trigger_contracts_fetched(&self, security_type: SecurityType) {
+        for callback in &self.contract_callbacks {
+            callback.on_contracts_fetched(security_type.clone());
+        }
+    }
+    
+    /// Trigger all contracts fetched callbacks
+    pub fn trigger_all_contracts_fetched(&self) {
+        for callback in &self.contract_callbacks {
+            callback.on_all_contracts_fetched();
         }
     }
 }

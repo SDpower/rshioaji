@@ -27,14 +27,14 @@ fn test_contract_creation() {
     let proxies = HashMap::new();
     let client = Shioaji::new(true, proxies).unwrap();
     
-    // Test stock contract creation
-    let stock = client.create_stock("2330", Exchange::TSE);
-    assert_eq!(stock.contract.base.code, "2330");
-    assert_eq!(stock.contract.base.exchange, Exchange::TSE);
-    assert_eq!(stock.contract.base.security_type, rshioaji::SecurityType::Stock);
+    // Test TXFG5 futures contract creation
+    let txfg5_future = client.create_future("TXFG5", Exchange::TAIFEX);
+    assert_eq!(txfg5_future.contract.base.code, "TXFG5");
+    // TXFG5 is traded on TAIFEX
+    assert_eq!(txfg5_future.contract.base.security_type, rshioaji::SecurityType::Future);
     
     // Test future contract creation
-    let future = client.create_future("TXFA4");
+    let future = client.create_future("TXFA4", Exchange::TAIFEX);
     assert_eq!(future.contract.base.code, "TXFA4");
     assert_eq!(future.contract.base.exchange, Exchange::TAIFEX);
     assert_eq!(future.contract.base.security_type, rshioaji::SecurityType::Future);

@@ -1,20 +1,23 @@
-# Multi-stage build for rshioaji macOS ARM64 with Python 3.12 support
+# Multi-stage build for rshioaji macOS ARM64 with Python 3.13 support and PyO3 bridge
 # Note: This requires Docker Desktop with experimental features enabled
 FROM --platform=linux/arm64 rust:1.75-slim as rust-builder
 
-# Install system dependencies for Python 3.12 and cross-compilation
+# Install system dependencies for Python 3.13 and cross-compilation with PyO3 bridge
 RUN apt-get update && apt-get install -y \
     pkg-config \
     libssl-dev \
-    python3.12-dev \
-    python3.12-venv \
+    python3.13-dev \
+    python3.13-venv \
     python3-pip \
     binutils \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure Python 3.12 is available
-RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
+# Ensure Python 3.13 is available
+RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.13 1
+
+# Install shioaji[speed] for PyO3 bridge integration
+RUN pip3 install --no-cache-dir "shioaji[speed]"
 
 # Set working directory
 WORKDIR /app
@@ -28,10 +31,10 @@ COPY lib/ ./lib/
 COPY examples/ ./examples/
 COPY tests/ ./tests/
 
-# Set environment for macOS ARM64 with Python 3.12 support
+# Set environment for macOS ARM64 with Python 3.13 support
 ENV RSHIOAJI_PLATFORM=macosx_arm
-ENV PYTHON_VERSION=3.12
-ENV PYO3_PYTHON=python3.12
+ENV PYTHON_VERSION=3.13
+ENV PYO3_PYTHON=python3.13
 
 # Add target for ARM64 and build
 RUN rustup target add aarch64-unknown-linux-gnu
@@ -46,9 +49,13 @@ FROM --platform=linux/arm64 debian:bookworm-slim
 # Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    python3.12 \
+    python3.13 \
+    python3-pip \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r rshioaji && useradd -r -g rshioaji rshioaji
+
+# Install shioaji[speed] for runtime PyO3 bridge
+RUN pip3 install --no-cache-dir "shioaji[speed]"
 
 # Set working directory
 WORKDIR /app
@@ -62,9 +69,9 @@ COPY --from=rust-builder /app/target/aarch64-unknown-linux-gnu/release/librshioa
 # Copy examples
 COPY --from=rust-builder /app/examples/ ./examples/
 
-# Set environment variables for ARM64 and Python 3.12
+# Set environment variables for ARM64 and Python 3.13
 ENV RSHIOAJI_PLATFORM=macosx_arm
-ENV PYTHON_VERSION=3.12
+ENV PYTHON_VERSION=3.13
 ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Change ownership to non-root user
