@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Login with credentials
     if !api_key.is_empty() && !secret_key.is_empty() {
         info!("Logging in...");
-        let accounts = client.login(&api_key, &secret_key, true).await?;
+        let accounts = client.login_simple(&api_key, &secret_key, true).await?;
         info!("Login successful! Found {} accounts", accounts.len());
         
         for account in &accounts {
@@ -112,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let stock = client.create_stock(&stock_code, Exchange::TSE);
             
             // Subscribe to market data
-            if let Err(e) = client.subscribe(stock.contract.clone(), rshioaji::QuoteType::Tick).await {
+            if let Err(e) = client.subscribe(stock.contract.clone(), "tick").await {
                 log::warn!("Failed to subscribe to market data: {}", e);
             }
             
@@ -122,10 +122,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .format("%Y-%m-%d")
                 .to_string();
             
-            match client.kbars(stock.contract.clone(), &start_date, &end_date).await {
+            match client.get_kbars(stock.contract.clone(), &start_date, &end_date).await {
                 Ok(kbars) => {
-                    info!("Fetched {} K-bars for {}", kbars.data.len(), stock_code);
-                    if let Some(latest) = kbars.data.last() {
+                    info!("Fetched {} K-bars for {}", kbars.len(), stock_code);
+                    if let Some(latest) = kbars.last() {
                         info!(
                             "Latest: Open={}, High={}, Low={}, Close={}, Volume={}",
                             latest.open, latest.high, latest.low, latest.close, latest.volume

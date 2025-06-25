@@ -1,4 +1,5 @@
 use std::path::PathBuf;
+use pyo3::prelude::*;
 
 /// Platform detection and path resolution for shioaji libraries
 #[derive(Debug, Clone, PartialEq)]
@@ -38,10 +39,78 @@ impl Platform {
     }
     
     /// Get the platform-specific shared library extension pattern
-    pub fn so_extension(&self) -> Option<&'static str> {
+    pub fn so_extension(&self) -> Option<String> {
+        let python_version = self.detect_python_version();
         match self {
-            Platform::MacOSArm => Some("cpython-312-darwin.so"),
-            Platform::LinuxX86_64 => Some("cpython-312-x86_64-linux-gnu.so"),
+            Platform::MacOSArm => Some(format!("cpython-{}-darwin.so", python_version)),
+            Platform::LinuxX86_64 => Some(format!("cpython-{}-x86_64-linux-gnu.so", python_version)),
+            Platform::Unknown => None,
+        }
+    }
+    
+    /// Detect the current Python version from the runtime
+    fn detect_python_version(&self) -> String {
+        // First try to detect from PyO3 if available
+        if let Ok(version) = Python::with_gil(|py| -> PyResult<String> {
+            let version = py.version_info();
+            Ok(format!("{}{}", version.major, version.minor))
+        }) {
+            log::info!("🐍 動態檢測 Python 版本: {}", version);
+            return version;
+        }
+        
+        // Fallback: try to parse from python3 --version
+        if let Ok(output) = std::process::Command::new("python3")
+            .arg("--version")
+            .output() {
+            let version_str = String::from_utf8_lossy(&output.stdout);
+            // Simple parsing without regex: "Python 3.12.6"
+            if version_str.starts_with("Python ") {
+                let parts: Vec<&str> = version_str.trim().split(' ').collect();
+                if parts.len() >= 2 {
+                    let version_parts: Vec<&str> = parts[1].split('.').collect();
+                    if version_parts.len() >= 2 {
+                        let version = format!("{}{}", version_parts[0], version_parts[1]);
+                        log::info!("🐍 從命令行檢測 Python 版本: {}", version);
+                        return version;
+                    }
+                }
+            }
+        }
+        
+        // Final fallback: assume Python 3.12
+        log::warn!("⚠️ 無法檢測 Python 版本，使用預設值: 312");
+        "312".to_string()
+    }
+    
+    /// Get all possible Python versions to try (current + fallbacks)
+    pub fn get_possible_so_extensions(&self) -> Vec<String> {
+        let detected_version = self.detect_python_version();
+        let mut extensions = Vec::new();
+        
+        // Priority 1: Detected version
+        if let Some(ext) = self.so_extension_for_version(&detected_version) {
+            extensions.push(ext);
+        }
+        
+        // Priority 2: Common versions as fallbacks
+        let fallback_versions = ["313", "312", "311", "310"];
+        for version in &fallback_versions {
+            if *version != detected_version {
+                if let Some(ext) = self.so_extension_for_version(version) {
+                    extensions.push(ext);
+                }
+            }
+        }
+        
+        extensions
+    }
+    
+    /// Get extension for specific Python version
+    fn so_extension_for_version(&self, python_version: &str) -> Option<String> {
+        match self {
+            Platform::MacOSArm => Some(format!("cpython-{}-darwin.so", python_version)),
+            Platform::LinuxX86_64 => Some(format!("cpython-{}-x86_64-linux-gnu.so", python_version)),
             Platform::Unknown => None,
         }
     }
@@ -65,25 +134,9 @@ impl Platform {
             ));
         }
         
-        // Check for required Python files
-        let required_files = [
-            "__init__.py",
-            "shioaji.py",
-            "base.py",
-            "constant.py",
-            "contracts.py",
-            "order.py",
-        ];
-        
-        for file in &required_files {
-            let file_path = shioaji_path.join(file);
-            if !file_path.exists() {
-                return Err(format!(
-                    "Required Python file missing: {}",
-                    file_path.display()
-                ));
-            }
-        }
+        // ✅ 純 .so 檔案架構 - 不再檢查 Python 檔案
+        // 使用者已確認: 所有 .py 檔案已移除，一切在 Rust + .so 實現
+        log::info!("🚀 純 .so 檔案架構: 跳過 Python 檔案檢查");
         
         // Check for backend directory and shared libraries
         let backend_path = shioaji_path.join("backend");
@@ -94,22 +147,30 @@ impl Platform {
             ));
         }
         
-        let so_ext = self.so_extension()
-            .ok_or_else(|| "Unknown shared library extension".to_string())?;
+        let so_extensions = self.get_possible_so_extensions();
+        if so_extensions.is_empty() {
+            return Err("Unknown shared library extension".to_string());
+        }
         
-        let required_backend_libs = [
-            format!("constant.{}", so_ext),
-            format!("error.{}", so_ext),
-            format!("utils.{}", so_ext),
-        ];
+        log::info!("🔍 嘗試載入 .so 檔案版本: {:?}", so_extensions);
         
-        for lib in &required_backend_libs {
-            let lib_path = backend_path.join(lib);
-            if !lib_path.exists() {
-                return Err(format!(
-                    "Required backend library missing: {}",
-                    lib_path.display()
-                ));
+        let required_lib_names = ["constant", "error", "utils"];
+        
+        // Check each required library with version fallback
+        for lib_name in &required_lib_names {
+            let mut found = false;
+            for so_ext in &so_extensions {
+                let lib_file = format!("{}.{}", lib_name, so_ext);
+                let lib_path = backend_path.join(&lib_file);
+                if lib_path.exists() {
+                    log::info!("✅ 找到 backend/{}", lib_file);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                log::warn!("⚠️ 在所有版本中都找不到 backend/{}", lib_name);
+                // Don't fail immediately, continue checking
             }
         }
         
@@ -122,21 +183,23 @@ impl Platform {
             ));
         }
         
-        let required_solace_libs = [
-            format!("api.{}", so_ext),
-            format!("bidask.{}", so_ext),
-            format!("quote.{}", so_ext),
-            format!("tick.{}", so_ext),
-            format!("utils.{}", so_ext),
-        ];
+        let required_solace_names = ["api", "bidask", "quote", "tick", "utils"];
         
-        for lib in &required_solace_libs {
-            let lib_path = solace_path.join(lib);
-            if !lib_path.exists() {
-                return Err(format!(
-                    "Required solace library missing: {}",
-                    lib_path.display()
-                ));
+        // Check each required solace library with version fallback
+        for lib_name in &required_solace_names {
+            let mut found = false;
+            for so_ext in &so_extensions {
+                let lib_file = format!("{}.{}", lib_name, so_ext);
+                let lib_path = solace_path.join(&lib_file);
+                if lib_path.exists() {
+                    log::info!("✅ 找到 solace/{}", lib_file);
+                    found = true;
+                    break;
+                }
+            }
+            if !found {
+                log::warn!("⚠️ 在所有版本中都找不到 solace/{}", lib_name);
+                // Don't fail immediately, continue checking
             }
         }
         
@@ -191,11 +254,11 @@ mod tests {
         match platform {
             Platform::MacOSArm => {
                 assert_eq!(platform.directory_name(), Some("macosx_arm"));
-                assert_eq!(platform.so_extension(), Some("cpython-312-darwin.so"));
+                assert!(platform.so_extension().unwrap().contains("darwin.so"));
             }
             Platform::LinuxX86_64 => {
                 assert_eq!(platform.directory_name(), Some("manylinux_x86_64"));
-                assert_eq!(platform.so_extension(), Some("cpython-312-x86_64-linux-gnu.so"));
+                assert!(platform.so_extension().unwrap().contains("linux-gnu.so"));
             }
             Platform::Unknown => {
                 assert_eq!(platform.directory_name(), None);

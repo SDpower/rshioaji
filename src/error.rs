@@ -32,8 +32,38 @@ pub enum Error {
     #[error("API error: {0}")]
     Api(String),
     
-    #[error("Not logged in")]
-    NotLoggedIn,
+    #[error("Not logged in: {0}")]
+    NotLoggedIn(String),
+    
+    #[error("Client not initialized: {0}")]
+    NotInitialized(String),
+    
+    #[error("Initialization error: {0}")]
+    Initialization(String),
+    
+    #[error("Contract fetch error: {0}")]
+    ContractFetch(String),
+    
+    #[error("Trading error: {0}")]
+    Trading(String),
+    
+    #[error("Subscription error: {0}")]
+    Subscription(String),
+    
+    #[error("Callback error: {0}")]
+    Callback(String),
+    
+    #[error("Connection error: {0}")]
+    Connection(String),
+    
+    #[error("Data fetch error: {0}")]
+    DataFetch(String),
+    
+    #[error("File system error: {0}")]
+    FileSystem(String),
+    
+    #[error("Invalid input: {0}")]
+    InvalidInput(String),
     
     #[error("Account not found")]
     AccountNotFound,
@@ -44,8 +74,14 @@ pub enum Error {
     #[error("Market closed")]
     MarketClosed,
     
+    #[error("Timeout error: {0}")]
+    Timeout(String),
+    
     #[error("Unknown error: {0}")]
     Unknown(String),
+    
+    #[error("System error: {0}")]
+    System(String),
 }
 
 impl<'a> From<PyDowncastError<'a>> for Error {

@@ -99,19 +99,9 @@ fn main() {
         println!("cargo:rustc-link-search=native={}", backend_path.display());
         println!("cargo:rustc-link-search=native={}", solace_path.display());
         
-        // For macOS, we might need additional library paths
-        if target_os == "macos" {
-            println!("cargo:rustc-env=DYLD_LIBRARY_PATH={0}:{1}", 
-                     backend_path.display(), 
-                     solace_path.display());
-        }
-        
-        // For Linux, we might need additional library paths
-        if target_os == "linux" {
-            println!("cargo:rustc-env=LD_LIBRARY_PATH={0}:{1}", 
-                     backend_path.display(), 
-                     solace_path.display());
-        }
+        // Note: We don't set DYLD_LIBRARY_PATH or LD_LIBRARY_PATH anymore
+        // as they can interfere with PyO3's Python environment when using
+        // system shioaji. The .so files are mainly for static linking scenarios.
     }
 }
 

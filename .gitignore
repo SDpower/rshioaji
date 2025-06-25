@@ -69,6 +69,10 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+*_temp.rs
+*_test.py
+quick_*.rs
+test_python_*.py
 
 # Editor backups
 *.bak
@@ -145,3 +149,7 @@ scripts/dev/logs/
 # Keep documentation
 !README*.md
 !docs/**/*.md
+
+.cursor/
+.claude/
+CLAUDE.md

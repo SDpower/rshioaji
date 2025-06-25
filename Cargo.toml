@@ -44,6 +44,11 @@ clap = { version = "4.0", features = ["derive"] }
 async-trait = "0.1"
 # Optional Sentry integration
 sentry = { version = "0.32", optional = true }
+# Directory utilities
+dirs = "5.0"
+home = "0.5"
+# Random number generation
+fastrand = "2.0"
 
 [lib]
 name = "rshioaji"

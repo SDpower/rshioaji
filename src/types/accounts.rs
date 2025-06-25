@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum AccountType {
-    Stock,  // S - 股票帳戶
-    Future, // F - 期貨帳戶
+    Stock,      // S - 股票帳戶
+    Future,     // F - 期貨帳戶
+    Simulation, // H - 模擬帳戶
 }
 
 impl std::fmt::Display for AccountType {
@@ -11,6 +12,7 @@ impl std::fmt::Display for AccountType {
         match self {
             AccountType::Stock => write!(f, "S"),
             AccountType::Future => write!(f, "F"),
+            AccountType::Simulation => write!(f, "H"),
         }
     }
 }

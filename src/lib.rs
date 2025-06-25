@@ -23,36 +23,29 @@
 //! ## Quick Start
 //! 
 //! ```no_run
-//! use rshioaji::{Shioaji, TickCallback, Exchange, TickSTKv1};
-//! use std::sync::Arc;
-//! 
-//! struct MyHandler;
-//! 
-//! impl TickCallback for MyHandler {
-//!     fn on_tick_stk_v1(&self, exchange: Exchange, tick: TickSTKv1) {
-//!         println!("Received tick for {}: {}", tick.code, tick.close);
-//!     }
-//!     
-//!     fn on_tick_fop_v1(&self, exchange: Exchange, tick: rshioaji::TickFOPv1) {
-//!         // Handle futures/options tick
-//!     }
-//! }
+//! use rshioaji::{Shioaji, Exchange, TickSTKv1};
+//! use std::collections::HashMap;
 //! 
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let client = Shioaji::new(true, std::collections::HashMap::new())?;
+//!     let client = Shioaji::new(true, HashMap::new())?;
 //!     client.init().await?;
 //!     
-//!     // Register callback
-//!     let handler = Arc::new(MyHandler);
-//!     client.register_tick_callback(handler).await;
-//!     client.setup_callbacks().await?;
+//!     // Register stock tick callback
+//!     client.on_tick_stk_v1(|exchange: Exchange, tick: TickSTKv1| {
+//!         println!("Received tick for {}: {}", tick.code, tick.close);
+//!     }, false).await?;
+//!     
+//!     // Register system event callback
+//!     client.on_event(|resp_code, event_code, info, event| {
+//!         println!("System event: {} {} - {} {}", resp_code, event_code, info, event);
+//!     }).await?;
 //!     
 //!     Ok(())
 //! }
 //! ```
 
-pub mod bindings;
+// pub mod bindings; // Removed - using pure system shioaji architecture
 pub mod callbacks;
 pub mod client;
 pub mod config;
@@ -67,7 +60,18 @@ pub use client::Shioaji;
 pub use config::Config;
 pub use error::{Error, Result};
 pub use platform::Platform;
-pub use utils::{EnvironmentConfig, init_logging, set_error_tracking, clear_outdated_contract_cache, check_contract_cache};
+pub use utils::{
+    EnvironmentConfig, 
+    init_logging, 
+    set_error_tracking, 
+    clear_outdated_contract_cache, 
+    check_contract_cache,
+    create_shared_folder,
+    get_contract_folder,
+    raise_resp_error,
+    timeout_exception,
+    status_error_wrapper
+};
 
 // Re-export all types from the types module
 pub use types::{
