@@ -47,6 +47,24 @@ pub struct Shioaji {
     default_futopt_account: Arc<Mutex<Option<FutureAccount>>>,
     /// 錯誤追蹤設定 (對應原始 Python 的 error_tracking)
     error_tracking_enabled: Arc<Mutex<bool>>,
+    
+    // === 全域 Callback 儲存機制 ===
+    /// 股票 Tick 回調函數
+    tick_stk_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(Exchange, TickSTKv1) + Send + Sync>>>>,
+    /// 期貨/選擇權 Tick 回調函數
+    tick_fop_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(Exchange, TickFOPv1) + Send + Sync>>>>,
+    /// 股票 BidAsk 回調函數
+    bidask_stk_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(Exchange, BidAskSTKv1) + Send + Sync>>>>,
+    /// 期貨/選擇權 BidAsk 回調函數
+    bidask_fop_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(Exchange, BidAskFOPv1) + Send + Sync>>>>,
+    /// 股票 Quote 回調函數
+    quote_stk_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(Exchange, QuoteSTKv1) + Send + Sync>>>>,
+    /// 通用 Quote 回調函數
+    quote_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(String, serde_json::Value) + Send + Sync>>>>,
+    /// 系統事件回調函數
+    event_callbacks: Arc<Mutex<Vec<Arc<dyn Fn(i32, i32, String, String) + Send + Sync>>>>,
+    /// 連線中斷回調函數
+    session_down_callbacks: Arc<Mutex<Vec<Arc<dyn Fn() + Send + Sync>>>>,
 }
 
 /// Contracts cache for business logic
@@ -94,6 +112,16 @@ impl Shioaji {
             default_stock_account: Arc::new(Mutex::new(None)),
             default_futopt_account: Arc::new(Mutex::new(None)),
             error_tracking_enabled: Arc::new(Mutex::new(false)),
+            
+            // 初始化全域 Callback 儲存
+            tick_stk_callbacks: Arc::new(Mutex::new(Vec::new())),
+            tick_fop_callbacks: Arc::new(Mutex::new(Vec::new())),
+            bidask_stk_callbacks: Arc::new(Mutex::new(Vec::new())),
+            bidask_fop_callbacks: Arc::new(Mutex::new(Vec::new())),
+            quote_stk_callbacks: Arc::new(Mutex::new(Vec::new())),
+            quote_callbacks: Arc::new(Mutex::new(Vec::new())),
+            event_callbacks: Arc::new(Mutex::new(Vec::new())),
+            session_down_callbacks: Arc::new(Mutex::new(Vec::new())),
         })
     }
     
@@ -2045,34 +2073,243 @@ inject_libpath()
             let quote = instance.getattr(py, "quote")
                 .map_err(|e| Error::Connection(format!("Failed to get quote object: {:?}", e)))?;
             
+            // Clone callback collections for use in closures
+            let tick_stk_callbacks = self.tick_stk_callbacks.clone();
+            let tick_fop_callbacks = self.tick_fop_callbacks.clone();
+            let _bidask_stk_callbacks = self.bidask_stk_callbacks.clone();
+            let _bidask_fop_callbacks = self.bidask_fop_callbacks.clone();
+            let _quote_stk_callbacks = self.quote_stk_callbacks.clone();
+            let _quote_callbacks = self.quote_callbacks.clone();
+            let _event_callbacks = self.event_callbacks.clone();
+            let _session_down_callbacks = self.session_down_callbacks.clone();
+            
             // Create callback functions for system shioaji
-            let tick_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                println!("🎯 [Python→Rust] 股票 Tick 回調觸發: {:?}", args);
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+            let tick_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, move |args, _kwargs| -> PyResult<PyObject> {
+                // Parse the args from Python callback: (exchange_enum, tick_object)
+                if args.len() >= 2 {
+                    // Try to extract exchange from either string or enum
+                    let exchange = if let Ok(exchange_str) = args.get_item(0).and_then(|item| item.extract::<String>()) {
+                        // String format: "TSE", "TAIFEX", etc.
+                        match exchange_str.as_str() {
+                            "TSE" => crate::types::Exchange::TSE,
+                            "OTC" => crate::types::Exchange::OTC, 
+                            "TXE" | "TAIFEX" => crate::types::Exchange::TAIFEX,
+                            _ => crate::types::Exchange::TSE, // Default fallback
+                        }
+                    } else if let Ok(exchange_obj) = args.get_item(0) {
+                        // Python enum object: try to get the value
+                        if let Ok(enum_value) = exchange_obj.getattr("value") {
+                            if let Ok(value_str) = enum_value.extract::<String>() {
+                                match value_str.as_str() {
+                                    "TSE" => crate::types::Exchange::TSE,
+                                    "OTC" => crate::types::Exchange::OTC,
+                                    "TAIFEX" => crate::types::Exchange::TAIFEX,
+                                    _ => crate::types::Exchange::TSE,
+                                }
+                            } else {
+                                crate::types::Exchange::TSE // Default for stocks
+                            }
+                        } else {
+                            crate::types::Exchange::TSE // Default for stocks
+                        }
+                    } else {
+                        crate::types::Exchange::TSE // Default for stocks
+                    };
+                    
+                    // Extract tick data from Tick object (not dictionary)
+                    if let Ok(tick_obj) = args.get_item(1) {
+                        // Extract key fields from Tick object attributes
+                        let code = tick_obj.getattr("code")
+                            .and_then(|v| v.extract::<String>()).unwrap_or_default();
+                        let close = tick_obj.getattr("close")
+                            .and_then(|v| v.extract::<f64>()).unwrap_or(0.0);
+                        let volume = tick_obj.getattr("volume")
+                            .and_then(|v| v.extract::<i64>()).unwrap_or(0);
+                        
+                        // Convert Python data to Rust TickSTKv1 struct
+                        let tick_data = crate::types::TickSTKv1 {
+                            code,
+                            close,
+                            volume,
+                            // Extract additional fields if available
+                            open: tick_obj.getattr("open")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            high: tick_obj.getattr("high")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            low: tick_obj.getattr("low")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            amount: tick_obj.getattr("amount")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            total_amount: tick_obj.getattr("total_amount")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            total_volume: tick_obj.getattr("total_volume")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            tick_type: tick_obj.getattr("tick_type")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0).into(),
+                            chg_type: tick_obj.getattr("chg_type")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0).into(),
+                            price_chg: tick_obj.getattr("price_chg")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            pct_chg: tick_obj.getattr("pct_chg")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            avg_price: tick_obj.getattr("avg_price")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            datetime: chrono::Utc::now(), // Use current time as default
+                            bid_side_total_vol: tick_obj.getattr("bid_side_total_vol")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            ask_side_total_vol: tick_obj.getattr("ask_side_total_vol")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            bid_side_total_cnt: tick_obj.getattr("bid_side_total_cnt")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            ask_side_total_cnt: tick_obj.getattr("ask_side_total_cnt")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            suspend: tick_obj.getattr("suspend")
+                                .and_then(|v| v.extract::<bool>()).unwrap_or(false),
+                            simtrade: tick_obj.getattr("simtrade")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0) != 0,
+                            // Set defaults for remaining fields
+                            ..Default::default()
+                        };
+                        
+                        // 🎯 CRITICAL FIX: Call registered user callbacks directly!
+                        if let Ok(callbacks_guard) = tick_stk_callbacks.try_lock() {
+                            for callback in callbacks_guard.iter() {
+                                // Execute each registered callback
+                                callback(exchange, tick_data.clone());
+                            }
+                            if !callbacks_guard.is_empty() {
+                                log::debug!("✅ Triggered {} STK tick callbacks for {}", 
+                                           callbacks_guard.len(), tick_data.code);
+                            }
+                        } else {
+                            log::warn!("Failed to acquire lock for STK tick callbacks");
+                        }
+                    } else {
+                        log::warn!("Failed to extract tick object from STK tick callback args: {:?}", args);
+                    }
+                } else {
+                    log::warn!("Insufficient parameters for STK tick callback: {:?}", args);
+                }
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
-            let tick_fop_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                println!("🎯 [Python→Rust] 期貨 Tick 回調觸發: {:?}", args);
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+            let tick_fop_callback = pyo3::types::PyCFunction::new_closure(py, None, None, move |args, _kwargs| -> PyResult<PyObject> {
+                // Parse the args from Python callback: (exchange_enum, tick_object)
+                if args.len() >= 2 {
+                    // Try to extract exchange from either string or enum
+                    let exchange = if let Ok(exchange_str) = args.get_item(0).and_then(|item| item.extract::<String>()) {
+                        // String format: "TSE", "TAIFEX", etc.
+                        match exchange_str.as_str() {
+                            "TSE" => crate::types::Exchange::TSE,
+                            "OTC" => crate::types::Exchange::OTC, 
+                            "TXE" | "TAIFEX" => crate::types::Exchange::TAIFEX,
+                            _ => crate::types::Exchange::TSE, // Default fallback
+                        }
+                    } else if let Ok(exchange_obj) = args.get_item(0) {
+                        // Python enum object: try to get the value
+                        if let Ok(enum_value) = exchange_obj.getattr("value") {
+                            if let Ok(value_str) = enum_value.extract::<String>() {
+                                match value_str.as_str() {
+                                    "TSE" => crate::types::Exchange::TSE,
+                                    "OTC" => crate::types::Exchange::OTC,
+                                    "TAIFEX" => crate::types::Exchange::TAIFEX,
+                                    _ => crate::types::Exchange::TSE,
+                                }
+                            } else {
+                                crate::types::Exchange::TAIFEX // Default for futures
+                            }
+                        } else {
+                            crate::types::Exchange::TAIFEX // Default for futures
+                        }
+                    } else {
+                        crate::types::Exchange::TAIFEX // Default for futures
+                    };
+                    
+                    // Extract tick data from Tick object (not dictionary)
+                    if let Ok(tick_obj) = args.get_item(1) {
+                        // Extract key fields from Tick object attributes
+                        let code = tick_obj.getattr("code")
+                            .and_then(|v| v.extract::<String>()).unwrap_or_default();
+                        let close = tick_obj.getattr("close")
+                            .and_then(|v| v.extract::<f64>()).unwrap_or(0.0);
+                        let volume = tick_obj.getattr("volume")
+                            .and_then(|v| v.extract::<i64>()).unwrap_or(0);
+                        
+                        // Convert Python data to Rust TickFOPv1 struct
+                        let tick_data = crate::types::TickFOPv1 {
+                            code,
+                            close,
+                            volume,
+                            // Extract additional fields if available
+                            open: tick_obj.getattr("open")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            high: tick_obj.getattr("high")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            low: tick_obj.getattr("low")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            amount: tick_obj.getattr("amount")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            total_amount: tick_obj.getattr("total_amount")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            total_volume: tick_obj.getattr("total_volume")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            tick_type: tick_obj.getattr("tick_type")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0).into(),
+                            chg_type: tick_obj.getattr("chg_type")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0).into(),
+                            price_chg: tick_obj.getattr("price_chg")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            pct_chg: tick_obj.getattr("pct_chg")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            avg_price: tick_obj.getattr("avg_price")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            datetime: chrono::Utc::now(), // Use current time as default
+                            underlying_price: tick_obj.getattr("underlying_price")
+                                .and_then(|v| v.extract::<f64>()).unwrap_or(0.0),
+                            bid_side_total_vol: tick_obj.getattr("bid_side_total_vol")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            ask_side_total_vol: tick_obj.getattr("ask_side_total_vol")
+                                .and_then(|v| v.extract::<i64>()).unwrap_or(0),
+                            simtrade: tick_obj.getattr("simtrade")
+                                .and_then(|v| v.extract::<i32>()).unwrap_or(0) != 0,
+                            // Set defaults for remaining fields
+                            ..Default::default()
+                        };
+                        
+                        // 🎯 CRITICAL FIX: Call registered user callbacks directly!
+                        if let Ok(callbacks_guard) = tick_fop_callbacks.try_lock() {
+                            for callback in callbacks_guard.iter() {
+                                // Execute each registered callback
+                                callback(exchange, tick_data.clone());
+                            }
+                            if !callbacks_guard.is_empty() {
+                                log::debug!("✅ Triggered {} FOP tick callbacks for {}", 
+                                           callbacks_guard.len(), tick_data.code);
+                            }
+                        } else {
+                            log::warn!("Failed to acquire lock for FOP tick callbacks");
+                        }
+                    } else {
+                        log::warn!("Failed to extract tick object from FOP tick callback args: {:?}", args);
+                    }
+                } else {
+                    log::warn!("Insufficient parameters for FOP tick callback: {:?}", args);
+                }
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
             let bidask_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                println!("🎯 [Python→Rust] 股票五檔回調觸發: {:?}", args);
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                log::debug!("STK bidask callback triggered with args: {:?}", args);
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
             let bidask_fop_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                println!("🎯 [Python→Rust] 期貨五檔回調觸發: {:?}", args);
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                log::debug!("FOP bidask callback triggered with args: {:?}", args);
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
             let quote_stk_callback = pyo3::types::PyCFunction::new_closure(py, None, None, |args, _kwargs| -> PyResult<PyObject> {
-                println!("🎯 [Python→Rust] 股票報價回調觸發: {:?}", args);
-                std::io::Write::flush(&mut std::io::stdout()).unwrap();
+                log::debug!("STK quote callback triggered with args: {:?}", args);
                 Python::with_gil(|py| Ok(py.None()))
             })?;
             
@@ -2475,25 +2712,27 @@ inject_libpath()
     where
         F: Fn(Exchange, crate::types::TickSTKv1) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_tick_stk_v1 callback for later registration (bind: {})", bind);
+        // Store callback in global storage
+        {
+            let mut callbacks = self.tick_stk_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_tick_stk_v1 callback in global storage (bind: {}, total: {})", bind, callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_tick_stk_callback_to_instance(py, instance, bind)?;
                 log::info!("✅ Registered on_tick_stk_v1 callback to existing instance (bind={})", bind);
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_tick_stk_v1 callback for later registration");
+            log::info!("📋 Stored on_tick_stk_v1 callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2503,25 +2742,27 @@ inject_libpath()
     where
         F: Fn(Exchange, crate::types::TickFOPv1) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_tick_fop_v1 callback for later registration (bind: {})", bind);
+        // Store callback in global storage
+        {
+            let mut callbacks = self.tick_fop_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_tick_fop_v1 callback in global storage (bind: {}, total: {})", bind, callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_tick_fop_callback_to_instance(py, instance, bind)?;
                 log::info!("✅ Registered on_tick_fop_v1 callback to existing instance (bind={})", bind);
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_tick_fop_v1 callback for later registration");
+            log::info!("📋 Stored on_tick_fop_v1 callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2531,25 +2772,27 @@ inject_libpath()
     where
         F: Fn(Exchange, crate::types::BidAskSTKv1) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_bidask_stk_v1 callback for later registration (bind: {})", bind);
+        // Store callback in global storage
+        {
+            let mut callbacks = self.bidask_stk_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_bidask_stk_v1 callback in global storage (bind: {}, total: {})", bind, callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_bidask_stk_callback_to_instance(py, instance, bind)?;
                 log::info!("✅ Registered on_bidask_stk_v1 callback to existing instance (bind={})", bind);
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_bidask_stk_v1 callback for later registration");
+            log::info!("📋 Stored on_bidask_stk_v1 callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2559,25 +2802,27 @@ inject_libpath()
     where
         F: Fn(Exchange, crate::types::BidAskFOPv1) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_bidask_fop_v1 callback for later registration (bind: {})", bind);
+        // Store callback in global storage
+        {
+            let mut callbacks = self.bidask_fop_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_bidask_fop_v1 callback in global storage (bind: {}, total: {})", bind, callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_bidask_fop_callback_to_instance(py, instance, bind)?;
                 log::info!("✅ Registered on_bidask_fop_v1 callback to existing instance (bind={})", bind);
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_bidask_fop_v1 callback for later registration");
+            log::info!("📋 Stored on_bidask_fop_v1 callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2587,25 +2832,27 @@ inject_libpath()
     where
         F: Fn(Exchange, crate::types::QuoteSTKv1) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_quote_stk_v1 callback for later registration (bind: {})", bind);
+        // Store callback in global storage
+        {
+            let mut callbacks = self.quote_stk_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_quote_stk_v1 callback in global storage (bind: {}, total: {})", bind, callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_quote_stk_callback_to_instance(py, instance, bind)?;
                 log::info!("✅ Registered on_quote_stk_v1 callback to existing instance (bind={})", bind);
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_quote_stk_v1 callback for later registration");
+            log::info!("📋 Stored on_quote_stk_v1 callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2613,27 +2860,29 @@ inject_libpath()
     /// Register generic quote callback (原始 on_quote)
     pub async fn on_quote<F>(&self, callback: F) -> Result<()>
     where
-        F: Fn(String, std::collections::HashMap<String, String>) + Send + Sync + 'static,
+        F: Fn(String, serde_json::Value) + Send + Sync + 'static,
     {
-        let _callback_arc = Arc::new(callback);
+        let callback_arc = Arc::new(callback);
         
-        // For now, just store the callback without trying to register to non-existent instance
-        log::info!("📋 Stored on_quote callback for later registration");
+        // Store callback in global storage
+        {
+            let mut callbacks = self.quote_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_quote callback in global storage (total: {})", callbacks.len());
+        }
         
         // If instance already exists, register immediately
         let instance_guard = self.instance.try_lock()
             .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
         
         if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|_py| -> Result<()> {
+            Python::with_gil(|py| -> Result<()> {
+                self.register_quote_callback_to_instance(py, instance)?;
                 log::info!("✅ Registered on_quote callback to existing instance");
-                // TODO: Implement actual callback registration to Python instance
-                // For now, just acknowledge that the callback would be registered
-                let _ = instance; // Use the instance variable to avoid warnings
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_quote callback for later registration");
+            log::info!("📋 Stored on_quote callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2645,7 +2894,14 @@ inject_libpath()
     {
         let callback_arc = Arc::new(callback);
         
-        // Store callback for later registration when instance is available
+        // Store callback in both global storage and legacy event handlers
+        {
+            let mut callbacks = self.event_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_event callback in global storage (total: {})", callbacks.len());
+        }
+        
+        // Also store in legacy event handlers for compatibility
         {
             let mut handlers = self._event_handlers.lock().await;
             handlers.register_event_closure(callback_arc.clone());
@@ -2662,7 +2918,7 @@ inject_libpath()
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_event callback for later registration");
+            log::info!("📋 Stored on_event callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2695,7 +2951,14 @@ inject_libpath()
     {
         let callback_arc = Arc::new(callback);
         
-        // Store callback for later registration when instance is available
+        // Store callback in both global storage and legacy event handlers
+        {
+            let mut callbacks = self.session_down_callbacks.lock().await;
+            callbacks.push(callback_arc.clone());
+            log::info!("📋 Stored on_session_down callback in global storage (total: {})", callbacks.len());
+        }
+        
+        // Also store in legacy event handlers for compatibility
         {
             let mut handlers = self._event_handlers.lock().await;
             handlers.register_session_down_closure(callback_arc.clone());
@@ -2712,7 +2975,7 @@ inject_libpath()
                 Ok(())
             })
         } else {
-            log::info!("📋 Stored on_session_down callback for later registration");
+            log::info!("📋 Stored on_session_down callback for later registration when instance is available");
             Ok(())
         }
     }
@@ -2770,5 +3033,211 @@ inject_libpath()
     #[allow(dead_code)]
     fn convert_quote_stk_v1(&self, _dict: &pyo3::types::PyDict) -> Result<crate::types::QuoteSTKv1> {
         Ok(crate::types::QuoteSTKv1::default())
+    }
+
+    // === Helper Methods for Python Bridge Registration ===
+    
+    /// Register tick STK callback to Python instance
+    fn register_tick_stk_callback_to_instance(&self, py: Python, instance: &PyObject, bind: bool) -> Result<()> {
+        log::info!("🔗 Attempting to register tick STK callback to Python instance (bind: {})", bind);
+        // TODO: Implement actual Python callback registration
+        // This would typically involve:
+        // 1. Creating a Python callable that bridges to our Rust callbacks
+        // 2. Calling instance.set_on_tick_stk_v1_callback() or similar
+        let _ = (py, instance, bind); // Avoid unused warnings
+        Ok(())
+    }
+    
+    /// Register tick FOP callback to Python instance
+    fn register_tick_fop_callback_to_instance(&self, py: Python, instance: &PyObject, bind: bool) -> Result<()> {
+        log::info!("🔗 Attempting to register tick FOP callback to Python instance (bind: {})", bind);
+        // TODO: Implement actual Python callback registration
+        let _ = (py, instance, bind); // Avoid unused warnings
+        Ok(())
+    }
+    
+    /// Register bidask STK callback to Python instance
+    fn register_bidask_stk_callback_to_instance(&self, py: Python, instance: &PyObject, bind: bool) -> Result<()> {
+        log::info!("🔗 Attempting to register bidask STK callback to Python instance (bind: {})", bind);
+        // TODO: Implement actual Python callback registration
+        let _ = (py, instance, bind); // Avoid unused warnings
+        Ok(())
+    }
+    
+    /// Register bidask FOP callback to Python instance
+    fn register_bidask_fop_callback_to_instance(&self, py: Python, instance: &PyObject, bind: bool) -> Result<()> {
+        log::info!("🔗 Attempting to register bidask FOP callback to Python instance (bind: {})", bind);
+        // TODO: Implement actual Python callback registration
+        let _ = (py, instance, bind); // Avoid unused warnings
+        Ok(())
+    }
+    
+    /// Register quote STK callback to Python instance
+    fn register_quote_stk_callback_to_instance(&self, py: Python, instance: &PyObject, bind: bool) -> Result<()> {
+        log::info!("🔗 Attempting to register quote STK callback to Python instance (bind: {})", bind);
+        // TODO: Implement actual Python callback registration
+        let _ = (py, instance, bind); // Avoid unused warnings
+        Ok(())
+    }
+    
+    /// Register generic quote callback to Python instance
+    fn register_quote_callback_to_instance(&self, py: Python, instance: &PyObject) -> Result<()> {
+        log::info!("🔗 Attempting to register generic quote callback to Python instance");
+        // TODO: Implement actual Python callback registration
+        let _ = (py, instance); // Avoid unused warnings
+        Ok(())
+    }
+
+    // === Public Methods for Python Bridge Layer to Call ===
+    
+    /// Trigger tick STK callbacks from Python bridge layer
+    pub async fn trigger_tick_stk_callbacks(&self, exchange: Exchange, data: crate::types::TickSTKv1) -> Result<()> {
+        let callbacks = self.tick_stk_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} tick STK callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            // Execute callback in a separate task to avoid blocking
+            let callback_clone = callback.clone();
+            let exchange_clone = exchange.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(exchange_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All tick STK callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger tick FOP callbacks from Python bridge layer
+    pub async fn trigger_tick_fop_callbacks(&self, exchange: Exchange, data: crate::types::TickFOPv1) -> Result<()> {
+        let callbacks = self.tick_fop_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} tick FOP callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let exchange_clone = exchange.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(exchange_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All tick FOP callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger bidask STK callbacks from Python bridge layer
+    pub async fn trigger_bidask_stk_callbacks(&self, exchange: Exchange, data: crate::types::BidAskSTKv1) -> Result<()> {
+        let callbacks = self.bidask_stk_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} bidask STK callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let exchange_clone = exchange.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(exchange_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All bidask STK callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger bidask FOP callbacks from Python bridge layer
+    pub async fn trigger_bidask_fop_callbacks(&self, exchange: Exchange, data: crate::types::BidAskFOPv1) -> Result<()> {
+        let callbacks = self.bidask_fop_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} bidask FOP callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let exchange_clone = exchange.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(exchange_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All bidask FOP callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger quote STK callbacks from Python bridge layer
+    pub async fn trigger_quote_stk_callbacks(&self, exchange: Exchange, data: crate::types::QuoteSTKv1) -> Result<()> {
+        let callbacks = self.quote_stk_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} quote STK callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let exchange_clone = exchange.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(exchange_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All quote STK callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger generic quote callbacks from Python bridge layer
+    pub async fn trigger_quote_callbacks(&self, topic: String, data: serde_json::Value) -> Result<()> {
+        let callbacks = self.quote_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} generic quote callbacks for topic: {}", callbacks.len(), topic);
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let topic_clone = topic.clone();
+            let data_clone = data.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(topic_clone, data_clone);
+            });
+        }
+        
+        log::debug!("✅ All generic quote callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger event callbacks from Python bridge layer
+    pub async fn trigger_event_callbacks(&self, resp_code: i32, event_code: i32, info: String, event: String) -> Result<()> {
+        let callbacks = self.event_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} event callbacks (resp_code: {}, event_code: {})", callbacks.len(), resp_code, event_code);
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            let info_clone = info.clone();
+            let event_clone = event.clone();
+            
+            tokio::spawn(async move {
+                callback_clone(resp_code, event_code, info_clone, event_clone);
+            });
+        }
+        
+        log::debug!("✅ All event callbacks triggered");
+        Ok(())
+    }
+    
+    /// Trigger session down callbacks from Python bridge layer
+    pub async fn trigger_session_down_callbacks(&self) -> Result<()> {
+        let callbacks = self.session_down_callbacks.lock().await;
+        log::debug!("🚀 Triggering {} session down callbacks", callbacks.len());
+        
+        for callback in callbacks.iter() {
+            let callback_clone = callback.clone();
+            
+            tokio::spawn(async move {
+                callback_clone();
+            });
+        }
+        
+        log::debug!("✅ All session down callbacks triggered");
+        Ok(())
     }
 }

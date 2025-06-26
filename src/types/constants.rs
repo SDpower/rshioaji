@@ -15,7 +15,7 @@ impl std::fmt::Display for Action {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Exchange {
     TSE,   // 台灣證券交易所
     OTC,   // 櫃買中心
@@ -194,6 +194,16 @@ pub enum TickType {
     Sell, // 內盤
 }
 
+impl From<i32> for TickType {
+    fn from(value: i32) -> Self {
+        match value {
+            1 => TickType::Buy,
+            2 => TickType::Sell,
+            _ => TickType::No,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ChangeType {
     LimitUp,   // 漲停
@@ -201,6 +211,19 @@ pub enum ChangeType {
     Unchanged, // 平盤
     Down,      // 跌
     LimitDown, // 跌停
+}
+
+impl From<i32> for ChangeType {
+    fn from(value: i32) -> Self {
+        match value {
+            4 => ChangeType::LimitUp,
+            2 => ChangeType::Up,
+            3 => ChangeType::Unchanged,
+            1 => ChangeType::Down,
+            5 => ChangeType::LimitDown,
+            _ => ChangeType::Unchanged,
+        }
+    }
 }
 
 /// 合約獲取狀態 (對應原始 Python 的 FetchStatus)
