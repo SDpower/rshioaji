@@ -17,9 +17,9 @@ impl std::fmt::Display for Action {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Exchange {
-    TSE,   // 台灣證券交易所
-    OTC,   // 櫃買中心
-    OES,   // 興櫃
+    TSE,    // 台灣證券交易所
+    OTC,    // 櫃買中心
+    OES,    // 興櫃
     TAIFEX, // 期交所
 }
 
@@ -36,22 +36,22 @@ impl std::fmt::Display for Exchange {
 
 impl std::str::FromStr for Exchange {
     type Err = String;
-    
+
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "TSE" => Ok(Exchange::TSE),
             "OTC" => Ok(Exchange::OTC),
             "OES" => Ok(Exchange::OES),
             "TAIFEX" => Ok(Exchange::TAIFEX),
-            _ => Err(format!("Unknown exchange: {}", s))
+            _ => Err(format!("Unknown exchange: {}", s)),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum SecurityType {
-    Index, // 指數
-    Stock, // 股票
+    Index,  // 指數
+    Stock,  // 股票
     Future, // 期貨
     Option, // 選擇權
 }
@@ -118,10 +118,10 @@ impl std::fmt::Display for FuturesPriceType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum StockOrderLot {
-    Common,     // 整股
-    BlockTrade, // 鉅額
-    Fixing,     // 定盤
-    Odd,        // 零股
+    Common,      // 整股
+    BlockTrade,  // 鉅額
+    Fixing,      // 定盤
+    Odd,         // 零股
     IntradayOdd, // 盤中零股
 }
 
@@ -149,22 +149,22 @@ pub enum OptionRight {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Status {
-    Cancelled,    // 已取消
-    Filled,       // 已成交
-    PartFilled,   // 部分成交
-    Inactive,     // 無效
-    Failed,       // 失敗
+    Cancelled,     // 已取消
+    Filled,        // 已成交
+    PartFilled,    // 部分成交
+    Inactive,      // 無效
+    Failed,        // 失敗
     PendingSubmit, // 等待送出
-    PreSubmitted, // 預先送出
-    Submitted,    // 已送出
+    PreSubmitted,  // 預先送出
+    Submitted,     // 已送出
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OrderEventType {
-    StockDeal,   // 股票成交
-    StockOrder,  // 股票委託
+    StockDeal,    // 股票成交
+    StockOrder,   // 股票委託
     FuturesOrder, // 期貨委託
-    FuturesDeal, // 期貨成交
+    FuturesDeal,  // 期貨成交
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -176,8 +176,26 @@ pub enum QuoteType {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Currency {
-    TWD, USD, HKD, GBP, AUD, CAD, SGD, CHF, JPY, ZAR, 
-    SEK, NZD, THB, PHP, IDR, EUR, KRW, VND, MYR, CNY,
+    TWD,
+    USD,
+    HKD,
+    GBP,
+    AUD,
+    CAD,
+    SGD,
+    CHF,
+    JPY,
+    ZAR,
+    SEK,
+    NZD,
+    THB,
+    PHP,
+    IDR,
+    EUR,
+    KRW,
+    VND,
+    MYR,
+    CNY,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]

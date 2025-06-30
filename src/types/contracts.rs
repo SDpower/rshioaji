@@ -1,6 +1,6 @@
+use crate::types::constants::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::types::constants::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BaseContract {
@@ -208,14 +208,14 @@ pub struct ComboContract {
 }
 
 /// 合約集合結構 (對應原始 Python 的 Contracts 類別)
-/// 
+///
 /// 對應原始 Python 實作：
 /// ```python
 /// class Contracts:
 ///     def __init__(self):
 ///         self.status = FetchStatus.Unfetch
 ///         self.stocks = {}
-///         self.futures = {} 
+///         self.futures = {}
 ///         self.options = {}
 ///         self.indices = {}
 /// ```
@@ -238,11 +238,11 @@ pub struct Contracts {
 }
 
 /// 合約數量統計
-/// 
+///
 /// ## 🔍 重要說明：Shioaji Contracts 結構
-/// 
+///
 /// 所有合約類型都使用**群組結構**，需要解析群組內的個別合約：
-/// 
+///
 /// ### 股票合約結構
 /// ```python
 /// api.Contracts.Stocks = [
@@ -251,7 +251,7 @@ pub struct Contracts {
 ///     OES(...),  # 興櫃群組，包含所有興櫃股票
 /// ]
 /// ```
-/// 
+///
 /// ### 期貨合約結構
 /// ```python
 /// api.Contracts.Futures = [
@@ -261,7 +261,7 @@ pub struct Contracts {
 ///     # ... 359 個商品群組
 /// ]
 /// ```
-/// 
+///
 /// ### 選擇權合約結構  
 /// ```python
 /// api.Contracts.Options = [
@@ -270,7 +270,7 @@ pub struct Contracts {
 ///     # ... 60 個標的群組
 /// ]
 /// ```
-/// 
+///
 /// ### 指數合約結構
 /// ```python
 /// api.Contracts.Indexs = [
@@ -279,10 +279,9 @@ pub struct Contracts {
 ///     TSE(...),    # 證交所指數群組
 /// ]
 /// ```
-/// 
+///
 /// 因此正確的統計方法是解析每個群組內的個別合約代碼數量。
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ContractCounts {
     /// 股票總數 (TSE + OTC + OES)
     pub stocks: i32,
@@ -292,17 +291,17 @@ pub struct ContractCounts {
     pub stocks_otc: i32,
     /// OES (興櫃) 股票數量
     pub stocks_oes: i32,
-    
+
     /// 期貨合約總數 (所有商品群組的合約總和)
     pub futures: i32,
     /// 期貨商品群組數量 (BRF, BTF, CAF, etc.)
     pub futures_groups: i32,
-    
+
     /// 選擇權合約總數 (所有標的群組的合約總和)
     pub options: i32,
     /// 選擇權標的群組數量 (CAO, CBO, CCA, etc.)
     pub options_groups: i32,
-    
+
     /// 指數總數 (所有交易所的指數總和)
     pub indices: i32,
     /// OTC 指數數量
@@ -312,7 +311,6 @@ pub struct ContractCounts {
     /// TSE 指數數量
     pub indices_tse: i32,
 }
-
 
 impl ContractCounts {
     /// 計算總合約數
@@ -340,7 +338,7 @@ impl Contracts {
             counts: ContractCounts::default(),
         }
     }
-    
+
     /// 更新合約數量統計
     pub fn update_counts(&mut self) {
         self.counts.stocks = self.stocks.len() as i32;
@@ -349,37 +347,37 @@ impl Contracts {
         self.counts.indices = self.indices.len() as i32;
         self.last_updated = chrono::Utc::now();
     }
-    
+
     /// 加入股票合約
     pub fn add_stock(&mut self, code: String, contract: Contract) {
         self.stocks.insert(code, contract);
     }
-    
+
     /// 加入期貨合約
     pub fn add_future(&mut self, code: String, contract: Contract) {
         self.futures.insert(code, contract);
     }
-    
+
     /// 加入選擇權合約
     pub fn add_option(&mut self, code: String, contract: Contract) {
         self.options.insert(code, contract);
     }
-    
+
     /// 加入指數合約
     pub fn add_index(&mut self, code: String, contract: Contract) {
         self.indices.insert(code, contract);
     }
-    
+
     /// 取得總合約數
     pub fn total_count(&self) -> i32 {
         self.counts.stocks + self.counts.futures + self.counts.options + self.counts.indices
     }
-    
+
     /// 檢查是否為空
     pub fn is_empty(&self) -> bool {
         self.total_count() == 0
     }
-    
+
     /// 重置所有合約
     pub fn clear(&mut self) {
         self.stocks.clear();

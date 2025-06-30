@@ -44,7 +44,7 @@ impl Account {
             person_id: None,
         }
     }
-    
+
     pub fn with_person_id(mut self, person_id: String) -> Self {
         self.person_id = Some(person_id);
         self

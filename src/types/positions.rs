@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
 use crate::types::constants::*;
 use crate::types::contracts::Contract;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {

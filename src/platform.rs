@@ -17,7 +17,7 @@ impl Platform {
                 _ => {} // Fall through to auto-detection
             }
         }
-        
+
         // Use runtime detection instead of compile-time cfg! macros
         match (std::env::consts::OS, std::env::consts::ARCH) {
             ("macos", "aarch64") => Platform::MacOSArm,
@@ -25,7 +25,7 @@ impl Platform {
             _ => Platform::Unknown,
         }
     }
-    
+
     /// Get a human-readable name for the platform
     pub fn name(&self) -> &'static str {
         match self {
@@ -34,7 +34,7 @@ impl Platform {
             Platform::Unknown => "Unknown",
         }
     }
-    
+
     /// Check if the platform is supported for system shioaji integration
     pub fn is_supported(&self) -> bool {
         matches!(self, Platform::MacOSArm | Platform::LinuxX86_64)
@@ -54,7 +54,7 @@ mod tests {
     #[test]
     fn test_platform_detection() {
         let platform = Platform::detect();
-        
+
         // Test that we can detect some platform (won't be Unknown in CI)
         match std::env::consts::OS {
             "macos" if std::env::consts::ARCH == "aarch64" => {

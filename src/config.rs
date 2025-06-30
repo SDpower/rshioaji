@@ -40,14 +40,16 @@ impl Config {
         } else {
             log::debug!("No .env file found or failed to load, using environment variables only");
         }
-        
+
         let api_key = env::var("SHIOAJI_API_KEY")
             .or_else(|_| env::var("API_KEY"))
             .map_err(|_| ConfigError::EnvVarNotFound("SHIOAJI_API_KEY or API_KEY".to_string()))?;
 
         let secret_key = env::var("SHIOAJI_SECRET_KEY")
             .or_else(|_| env::var("SECRET_KEY"))
-            .map_err(|_| ConfigError::EnvVarNotFound("SHIOAJI_SECRET_KEY or SECRET_KEY".to_string()))?;
+            .map_err(|_| {
+                ConfigError::EnvVarNotFound("SHIOAJI_SECRET_KEY or SECRET_KEY".to_string())
+            })?;
 
         let simulation = env::var("SHIOAJI_SIMULATION")
             .or_else(|_| env::var("SIMULATION"))
@@ -74,7 +76,9 @@ impl Config {
 
         let secret_key = env::var("SHIOAJI_SECRET_KEY")
             .or_else(|_| env::var("SECRET_KEY"))
-            .map_err(|_| ConfigError::EnvVarNotFound("SHIOAJI_SECRET_KEY or SECRET_KEY".to_string()))?;
+            .map_err(|_| {
+                ConfigError::EnvVarNotFound("SHIOAJI_SECRET_KEY or SECRET_KEY".to_string())
+            })?;
 
         let simulation = env::var("SHIOAJI_SIMULATION")
             .or_else(|_| env::var("SIMULATION"))
@@ -93,7 +97,10 @@ impl Config {
     /// Load .env file and set environment variables
     fn load_dotenv_file(path: &str) -> Result<(), ConfigError> {
         if !Path::new(path).exists() {
-            return Err(ConfigError::DotenvError(format!("File not found: {}", path)));
+            return Err(ConfigError::DotenvError(format!(
+                "File not found: {}",
+                path
+            )));
         }
 
         dotenvy::from_filename(path)
@@ -106,20 +113,36 @@ impl Config {
     /// Validate the configuration
     pub fn validate(&self) -> Result<(), ConfigError> {
         if self.api_key.is_empty() {
-            return Err(ConfigError::InvalidConfig("API key cannot be empty".to_string()));
+            return Err(ConfigError::InvalidConfig(
+                "API key cannot be empty".to_string(),
+            ));
         }
 
         if self.secret_key.is_empty() {
-            return Err(ConfigError::InvalidConfig("Secret key cannot be empty".to_string()));
+            return Err(ConfigError::InvalidConfig(
+                "Secret key cannot be empty".to_string(),
+            ));
         }
 
         // Basic API key format validation (alphanumeric and common symbols)
-        if !self.api_key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-            return Err(ConfigError::InvalidConfig("API key contains invalid characters".to_string()));
+        if !self
+            .api_key
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(ConfigError::InvalidConfig(
+                "API key contains invalid characters".to_string(),
+            ));
         }
 
-        if !self.secret_key.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
-            return Err(ConfigError::InvalidConfig("Secret key contains invalid characters".to_string()));
+        if !self
+            .secret_key
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+        {
+            return Err(ConfigError::InvalidConfig(
+                "Secret key contains invalid characters".to_string(),
+            ));
         }
 
         Ok(())
@@ -160,7 +183,7 @@ mod tests {
             "test_secret_key".to_string(),
             true,
         );
-        
+
         assert_eq!(config.api_key, "test_api_key");
         assert_eq!(config.secret_key, "test_secret_key");
         assert!(config.simulation);
@@ -168,29 +191,17 @@ mod tests {
 
     #[test]
     fn test_config_validation() {
-        let valid_config = Config::new(
-            "testkey123".to_string(),
-            "testsecret456".to_string(),
-            true,
-        );
+        let valid_config = Config::new("testkey123".to_string(), "testsecret456".to_string(), true);
         assert!(valid_config.validate().is_ok());
 
-        let invalid_config = Config::new(
-            "".to_string(),
-            "testsecret456".to_string(),
-            true,
-        );
+        let invalid_config = Config::new("".to_string(), "testsecret456".to_string(), true);
         assert!(invalid_config.validate().is_err());
     }
 
     #[test]
     fn test_config_summary() {
-        let config = Config::new(
-            "testkey123".to_string(),
-            "testsecret456".to_string(),
-            false,
-        );
-        
+        let config = Config::new("testkey123".to_string(), "testsecret456".to_string(), false);
+
         let summary = config.summary();
         assert!(summary.contains("test***"));
         assert!(summary.contains("simulation: false"));
@@ -205,7 +216,7 @@ mod tests {
         env::set_var("SHIOAJI_SIMULATION", "false");
 
         let config = Config::from_env();
-        
+
         // Clean up
         env::remove_var("SHIOAJI_API_KEY");
         env::remove_var("SHIOAJI_SECRET_KEY");

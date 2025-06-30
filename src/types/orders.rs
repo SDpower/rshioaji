@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-use crate::types::constants::*;
 use crate::types::accounts::Account;
+use crate::types::constants::*;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Order {
@@ -39,17 +39,17 @@ impl Order {
             seqno: None,
         }
     }
-    
+
     pub fn with_account(mut self, account: Account) -> Self {
         self.account = Some(account);
         self
     }
-    
+
     pub fn with_order_lot(mut self, order_lot: StockOrderLot) -> Self {
         self.order_lot = Some(order_lot);
         self
     }
-    
+
     pub fn with_order_cond(mut self, order_cond: StockOrderCond) -> Self {
         self.order_cond = Some(order_cond);
         self
@@ -90,7 +90,7 @@ impl FuturesOrder {
             seqno: None,
         }
     }
-    
+
     pub fn with_account(mut self, account: Account) -> Self {
         self.account = Some(account);
         self
@@ -118,7 +118,7 @@ impl ComboOrder {
             seqno: None,
         }
     }
-    
+
     pub fn with_account(mut self, account: Account) -> Self {
         self.account = Some(account);
         self

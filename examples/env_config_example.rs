@@ -1,4 +1,4 @@
-use rshioaji::{Config, Shioaji, Exchange};
+use rshioaji::{Config, Exchange, Shioaji};
 use std::collections::HashMap;
 
 #[tokio::main]
@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     } else {
         println!("⚠️  No .env file found in current directory");
     }
-    
+
     println!("📋 Attempting to load configuration from .env file and environment variables...");
     println!();
 
@@ -24,54 +24,76 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Ok(config) => {
             println!("✅ Successfully loaded configuration from environment");
             println!("📋 {}", config.summary());
-            
+
             // Validate the configuration
             if let Err(e) = config.validate() {
                 eprintln!("❌ Configuration validation failed: {}", e);
                 return Ok(());
             }
-            
+
             println!("✅ Configuration validated successfully");
             println!();
 
             // Create Shioaji client using the configuration
             let proxies = HashMap::new();
             let client = Shioaji::new(config.simulation, proxies)?;
-            
+
             println!("🚀 Initializing Shioaji client...");
             client.init().await?;
             println!("✅ Client initialized successfully");
-            
+
             // Login using the configuration
             println!("🔐 Logging in with environment credentials...");
-            match client.login_simple(&config.api_key, &config.secret_key, true).await {
+            match client
+                .login_simple(&config.api_key, &config.secret_key, true)
+                .await
+            {
                 Ok(accounts) => {
                     println!("✅ Login successful! Found {} accounts", accounts.len());
-                    
+
                     for account in &accounts {
                         println!(
                             "👤 Account: {} ({}), Type: {:?}, Signed: {}",
-                            account.account_id, account.username, account.account_type, account.signed
+                            account.account_id,
+                            account.username,
+                            account.account_type,
+                            account.signed
                         );
                     }
-                    
+
                     // Demonstrate some basic functionality
                     println!();
                     println!("📈 Testing basic functionality...");
-                    
+
                     // Create a TXFG5 futures contract
                     let txfg5_future = client.create_future("TXFG5", Exchange::TAIFEX);
-                    println!("📊 Created contract for TXFG5 future: {:?}", txfg5_future.contract);
-                    
+                    println!(
+                        "📊 Created contract for TXFG5 future: {:?}",
+                        txfg5_future.contract
+                    );
+
                     // Try to subscribe to market data
-                    if let Err(e) = client.subscribe(txfg5_future.contract.clone(), "tick").await {
-                        println!("⚠️  Market data subscription failed (expected in demo): {}", e);
+                    if let Err(e) = client
+                        .subscribe(txfg5_future.contract.clone(), "tick")
+                        .await
+                    {
+                        println!(
+                            "⚠️  Market data subscription failed (expected in demo): {}",
+                            e
+                        );
                     }
-                    
+
                     // Check login status
                     let logged_in = client.is_logged_in().await;
-                    println!("📋 Login status: {}", if logged_in { "Logged in" } else { "Not logged in" });
-                    
+                    println!(
+                        "📋 Login status: {}",
+                        if logged_in {
+                            "Logged in"
+                        } else {
+                            "Not logged in"
+                        }
+                    );
+
                     // Show current functionality
                     println!();
                     println!("🎉 Environment configuration example completed successfully!");
