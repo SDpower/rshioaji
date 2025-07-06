@@ -15,6 +15,16 @@ impl std::fmt::Display for Action {
     }
 }
 
+impl Action {
+    pub fn from_string(s: &str) -> Self {
+        match s {
+            "Buy" => Action::Buy,
+            "Sell" => Action::Sell,
+            _ => Action::Buy, // Default
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Exchange {
     TSE,    // 台灣證券交易所
@@ -159,6 +169,37 @@ pub enum Status {
     Submitted,     // 已送出
 }
 
+impl std::fmt::Display for Status {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Status::Cancelled => write!(f, "Cancelled"),
+            Status::Filled => write!(f, "Filled"),
+            Status::PartFilled => write!(f, "PartFilled"),
+            Status::Inactive => write!(f, "Inactive"),
+            Status::Failed => write!(f, "Failed"),
+            Status::PendingSubmit => write!(f, "PendingSubmit"),
+            Status::PreSubmitted => write!(f, "PreSubmitted"),
+            Status::Submitted => write!(f, "Submitted"),
+        }
+    }
+}
+
+impl Status {
+    pub fn from_string(s: &str) -> Self {
+        match s {
+            "Cancelled" => Status::Cancelled,
+            "Filled" => Status::Filled,
+            "PartFilled" => Status::PartFilled,
+            "Inactive" => Status::Inactive,
+            "Failed" => Status::Failed,
+            "PendingSubmit" => Status::PendingSubmit,
+            "PreSubmitted" => Status::PreSubmitted,
+            "Submitted" => Status::Submitted,
+            _ => Status::Submitted, // Default
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum OrderEventType {
     StockDeal,    // 股票成交
@@ -240,6 +281,31 @@ impl From<i32> for ChangeType {
             1 => ChangeType::Down,
             5 => ChangeType::LimitDown,
             _ => ChangeType::Unchanged,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Unit {
+    Common,
+    Share,
+}
+
+impl std::fmt::Display for Unit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Unit::Common => write!(f, "Common"),
+            Unit::Share => write!(f, "Share"),
+        }
+    }
+}
+
+impl Unit {
+    pub fn from_string(s: &str) -> Self {
+        match s {
+            "Common" => Unit::Common,
+            "Share" => Unit::Share,
+            _ => Unit::Common, // Default
         }
     }
 }

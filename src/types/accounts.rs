@@ -17,6 +17,17 @@ impl std::fmt::Display for AccountType {
     }
 }
 
+impl AccountType {
+    pub fn from_string(s: &str) -> Self {
+        match s {
+            "S" | "Stock" => AccountType::Stock,
+            "F" | "Future" => AccountType::Future,
+            "H" | "Simulation" => AccountType::Simulation,
+            _ => AccountType::Stock, // Default
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
     pub broker_id: String,

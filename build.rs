@@ -3,6 +3,6 @@ fn main() {
 
     // rshioaji now uses pure system shioaji integration
     // No longer requires embedded .so files or static linking
-    println!("cargo:warning=rshioaji v0.4.8+ uses pure system shioaji integration");
+    println!("cargo:warning=rshioaji v0.4.9+ uses pure system shioaji integration");
     println!("cargo:warning=Please ensure system shioaji is installed: pip install shioaji");
 }

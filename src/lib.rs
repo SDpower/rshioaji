@@ -10,7 +10,7 @@
 //! - ⚡ **Async Support**: Built on tokio for async operations
 //! - 🛡️ **Type Safety**: Complete Rust type definitions with compile-time checks
 //!
-//! ## Version 0.4.8 - Market Data Structure Complete Compatibility
+//! ## Version 0.4.9 - Market Data Structure Complete Compatibility
 //!
 //! This version achieves complete compatibility with Python shioaji market data structures:
 //!

@@ -2309,6 +2309,172 @@ inject_libpath()
         })
     }
 
+    /// Update order price or quantity
+    pub async fn update_order(&self, trade: Trade, price: Option<f64>, qty: Option<i32>, timeout: Option<i32>) -> Result<Trade> {
+        log::info!("📊 Updating order ID: {}", trade.order_id);
+
+        // Validate login state
+        {
+            let logged_in = self.logged_in.lock().await;
+            if !*logged_in {
+                return Err(Error::NotLoggedIn(
+                    "Must login before updating orders".to_string(),
+                ));
+            }
+        }
+
+        // Get instance
+        let instance = {
+            let instance_guard = self.instance.lock().await;
+            instance_guard
+                .as_ref()
+                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
+                .clone()
+        };
+
+        // Perform system shioaji update_order
+        let updated_trade = self
+            .perform_system_update_order(&instance, trade, price, qty, timeout)
+            .await?;
+
+        log::info!(
+            "✅ Order updated successfully: Order ID {}",
+            updated_trade.order_id
+        );
+        Ok(updated_trade)
+    }
+
+    /// Cancel order
+    pub async fn cancel_order(&self, trade: Trade, timeout: Option<i32>) -> Result<Trade> {
+        log::info!("📊 Cancelling order ID: {}", trade.order_id);
+
+        // Validate login state
+        {
+            let logged_in = self.logged_in.lock().await;
+            if !*logged_in {
+                return Err(Error::NotLoggedIn(
+                    "Must login before cancelling orders".to_string(),
+                ));
+            }
+        }
+
+        // Get instance
+        let instance = {
+            let instance_guard = self.instance.lock().await;
+            instance_guard
+                .as_ref()
+                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
+                .clone()
+        };
+
+        // Perform system shioaji cancel_order
+        let cancelled_trade = self
+            .perform_system_cancel_order(&instance, trade, timeout)
+            .await?;
+
+        log::info!(
+            "✅ Order cancelled successfully: Order ID {}",
+            cancelled_trade.order_id
+        );
+        Ok(cancelled_trade)
+    }
+
+    /// List all trades
+    pub async fn list_trades(&self) -> Result<Vec<Trade>> {
+        log::info!("📊 Listing all trades");
+
+        // Validate login state
+        {
+            let logged_in = self.logged_in.lock().await;
+            if !*logged_in {
+                return Err(Error::NotLoggedIn(
+                    "Must login before listing trades".to_string(),
+                ));
+            }
+        }
+
+        // Get instance
+        let instance = {
+            let instance_guard = self.instance.lock().await;
+            instance_guard
+                .as_ref()
+                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
+                .clone()
+        };
+
+        // Perform system shioaji list_trades
+        let trades = self
+            .perform_system_list_trades(&instance)
+            .await?;
+
+        log::info!("✅ Listed {} trades", trades.len());
+        Ok(trades)
+    }
+
+    /// List all accounts
+    pub async fn list_accounts(&self) -> Result<Vec<Account>> {
+        log::info!("📊 Listing all accounts");
+
+        // Validate login state
+        {
+            let logged_in = self.logged_in.lock().await;
+            if !*logged_in {
+                return Err(Error::NotLoggedIn(
+                    "Must login before listing accounts".to_string(),
+                ));
+            }
+        }
+
+        // Get instance
+        let instance = {
+            let instance_guard = self.instance.lock().await;
+            instance_guard
+                .as_ref()
+                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
+                .clone()
+        };
+
+        // Perform system shioaji list_accounts
+        let accounts = self
+            .perform_system_list_accounts(&instance)
+            .await?;
+
+        log::info!("✅ Listed {} accounts", accounts.len());
+        Ok(accounts)
+    }
+
+    /// List positions
+    pub async fn list_positions(&self, account: Option<Account>, unit: Option<Unit>, timeout: Option<i32>) -> Result<Vec<Position>> {
+        log::info!("📊 Listing positions");
+
+        // Validate login state
+        {
+            let logged_in = self.logged_in.lock().await;
+            if !*logged_in {
+                return Err(Error::NotLoggedIn(
+                    "Must login before listing positions".to_string(),
+                ));
+            }
+        }
+
+        // Get instance
+        let instance = {
+            let instance_guard = self.instance.lock().await;
+            instance_guard
+                .as_ref()
+                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
+                .clone()
+        };
+
+        // Perform system shioaji list_positions
+        let positions = self
+            .perform_system_list_positions(&instance, account, unit, timeout)
+            .await?;
+
+        log::info!("✅ Listed {} positions", positions.len());
+        Ok(positions)
+    }
+
     /// Subscribe to market data using system shioaji API
     pub async fn subscribe(&self, contract: Contract, quote_type: &str) -> Result<String> {
         log::info!(
@@ -2455,6 +2621,181 @@ inject_libpath()
             );
 
             Ok(subscription_id)
+        })
+    }
+
+    /// Perform system shioaji update_order
+    async fn perform_system_update_order(
+        &self,
+        instance: &PyObject,
+        trade: Trade,
+        price: Option<f64>,
+        qty: Option<i32>,
+        timeout: Option<i32>,
+    ) -> Result<Trade> {
+        Python::with_gil(|py| -> Result<Trade> {
+            log::info!("📊 Calling system shioaji update_order...");
+
+            // Convert trade to Python object
+            let py_trade = self.convert_trade_to_python(py, &trade)?;
+
+            // Build parameters
+            let mut args = vec![py_trade];
+            if let Some(p) = price {
+                args.push(p.to_object(py));
+            } else {
+                args.push(py.None());
+            }
+            if let Some(q) = qty {
+                args.push(q.to_object(py));
+            } else {
+                args.push(py.None());
+            }
+            if let Some(t) = timeout {
+                args.push(t.to_object(py));
+            } else {
+                args.push(5000i32.to_object(py));
+            }
+
+            // Call update_order method
+            let trade_result = instance
+                .call_method(py, "update_order", pyo3::types::PyTuple::new(py, args), None)
+                .map_err(|e| {
+                    Error::Trading(format!("System shioaji update_order failed: {:?}", e))
+                })?;
+
+            log::info!("✅ System shioaji update_order successful");
+
+            // Convert result back to Trade object
+            let updated_trade = self.convert_python_trade_result(py, &trade_result)?;
+
+            Ok(updated_trade)
+        })
+    }
+
+    /// Perform system shioaji cancel_order
+    async fn perform_system_cancel_order(
+        &self,
+        instance: &PyObject,
+        trade: Trade,
+        timeout: Option<i32>,
+    ) -> Result<Trade> {
+        Python::with_gil(|py| -> Result<Trade> {
+            log::info!("📊 Calling system shioaji cancel_order...");
+
+            // Convert trade to Python object
+            let py_trade = self.convert_trade_to_python(py, &trade)?;
+
+            // Build parameters
+            let timeout_val = timeout.unwrap_or(5000);
+            let args = (py_trade, timeout_val);
+
+            // Call cancel_order method
+            let trade_result = instance
+                .call_method(py, "cancel_order", args, None)
+                .map_err(|e| {
+                    Error::Trading(format!("System shioaji cancel_order failed: {:?}", e))
+                })?;
+
+            log::info!("✅ System shioaji cancel_order successful");
+
+            // Convert result back to Trade object
+            let cancelled_trade = self.convert_python_trade_result(py, &trade_result)?;
+
+            Ok(cancelled_trade)
+        })
+    }
+
+    /// Perform system shioaji list_trades
+    async fn perform_system_list_trades(
+        &self,
+        instance: &PyObject,
+    ) -> Result<Vec<Trade>> {
+        Python::with_gil(|py| -> Result<Vec<Trade>> {
+            log::info!("📊 Calling system shioaji list_trades...");
+
+            // Call list_trades method
+            let trades_result = instance
+                .call_method(py, "list_trades", (), None)
+                .map_err(|e| {
+                    Error::Trading(format!("System shioaji list_trades failed: {:?}", e))
+                })?;
+
+            log::info!("✅ System shioaji list_trades successful");
+
+            // Convert result to Vec<Trade>
+            let trades = self.convert_python_trades_list(py, &trades_result)?;
+
+            Ok(trades)
+        })
+    }
+
+    /// Perform system shioaji list_accounts
+    async fn perform_system_list_accounts(
+        &self,
+        instance: &PyObject,
+    ) -> Result<Vec<Account>> {
+        Python::with_gil(|py| -> Result<Vec<Account>> {
+            log::info!("📊 Calling system shioaji list_accounts...");
+
+            // Call list_accounts method
+            let accounts_result = instance
+                .call_method(py, "list_accounts", (), None)
+                .map_err(|e| {
+                    Error::Trading(format!("System shioaji list_accounts failed: {:?}", e))
+                })?;
+
+            log::info!("✅ System shioaji list_accounts successful");
+
+            // Convert result to Vec<Account>
+            let accounts = self.convert_python_accounts_list(py, &accounts_result)?;
+
+            Ok(accounts)
+        })
+    }
+
+    /// Perform system shioaji list_positions
+    async fn perform_system_list_positions(
+        &self,
+        instance: &PyObject,
+        account: Option<Account>,
+        unit: Option<Unit>,
+        timeout: Option<i32>,
+    ) -> Result<Vec<Position>> {
+        Python::with_gil(|py| -> Result<Vec<Position>> {
+            log::info!("📊 Calling system shioaji list_positions...");
+
+            // Build parameters
+            let mut args = vec![];
+            if let Some(acc) = account {
+                let py_account = self.convert_account_to_python(py, &acc)?;
+                args.push(py_account);
+            } else {
+                args.push(py.None());
+            }
+
+            // Build kwargs
+            let kwargs = pyo3::types::PyDict::new(py);
+            if let Some(u) = unit {
+                kwargs.set_item("unit", self.convert_unit_to_python(py, &u)?)?;
+            }
+            if let Some(t) = timeout {
+                kwargs.set_item("timeout", t)?;
+            }
+
+            // Call list_positions method
+            let positions_result = instance
+                .call_method(py, "list_positions", pyo3::types::PyTuple::new(py, args), Some(kwargs))
+                .map_err(|e| {
+                    Error::Trading(format!("System shioaji list_positions failed: {:?}", e))
+                })?;
+
+            log::info!("✅ System shioaji list_positions successful");
+
+            // Convert result to Vec<Position>
+            let positions = self.convert_python_positions_list(py, &positions_result)?;
+
+            Ok(positions)
         })
     }
 
@@ -3084,180 +3425,6 @@ inject_libpath()
         })
     }
 
-    /// List all accounts using system shioaji API
-    pub async fn list_accounts(&self) -> Result<Vec<Account>> {
-        log::info!("📊 Listing accounts using system shioaji...");
-
-        // Check login state
-        {
-            let logged_in = self.logged_in.lock().await;
-            if !*logged_in {
-                return Err(Error::NotLoggedIn(
-                    "Must login before listing accounts".to_string(),
-                ));
-            }
-        }
-
-        // Get instance
-        let instance = {
-            let instance_guard = self.instance.lock().await;
-            instance_guard
-                .as_ref()
-                .ok_or_else(|| Error::NotInitialized("Client not initialized".to_string()))?
-                .clone()
-        };
-
-        // Perform system shioaji list_accounts
-        let accounts = self.perform_system_list_accounts(&instance).await?;
-
-        log::info!("✅ Listed {} accounts using system shioaji", accounts.len());
-        Ok(accounts)
-    }
-
-    /// Perform system shioaji account listing
-    async fn perform_system_list_accounts(&self, instance: &PyObject) -> Result<Vec<Account>> {
-        Python::with_gil(|py| -> Result<Vec<Account>> {
-            log::info!("📊 Calling system shioaji list_accounts...");
-
-            // Check if this is our system proxy (dictionary mode)
-            if let Ok(instance_dict) = instance.downcast::<pyo3::types::PyDict>(py) {
-                if let Some(instance_type) = instance_dict.get_item("type")? {
-                    if instance_type.to_string() == "SystemShioajiProxy" {
-                        log::info!("🔧 Using system shioaji proxy for list_accounts");
-
-                        // Return the same accounts as login (consistent behavior)
-                        let mut accounts = Vec::new();
-
-                        // Create default stock account
-                        let stock_account = Account::new(
-                            "9A95".to_string(),
-                            "STOCK001".to_string(),
-                            AccountType::Stock,
-                            "SystemUser".to_string(),
-                            true,
-                        );
-                        accounts.push(stock_account);
-
-                        // Create default future account
-                        let future_account = Account::new(
-                            "9A95".to_string(),
-                            "FUTURE001".to_string(),
-                            AccountType::Future,
-                            "SystemUser".to_string(),
-                            true,
-                        );
-                        accounts.push(future_account);
-
-                        log::info!(
-                            "✅ System shioaji proxy list_accounts completed with {} accounts",
-                            accounts.len()
-                        );
-                        return Ok(accounts);
-                    }
-                }
-            }
-
-            // For real shioaji instance, use already stored accounts from login
-            log::info!("🎯 Real shioaji instance - using stored accounts from login");
-
-            // Get accounts from stored login state (synchronous version)
-            let stored_accounts = self.get_stored_accounts_sync()?;
-
-            log::info!(
-                "✅ Retrieved {} accounts from login state",
-                stored_accounts.len()
-            );
-            Ok(stored_accounts)
-        })
-    }
-
-    /// Get stored accounts from login state (async version)
-    #[allow(dead_code)]
-    async fn get_stored_accounts_from_login(&self) -> Result<Vec<Account>> {
-        let mut accounts = Vec::new();
-
-        // Get stock account if available
-        {
-            let stock_guard = self.stock_account.lock().await;
-            if let Some(ref stock_acc) = *stock_guard {
-                accounts.push(stock_acc.account.clone());
-            }
-        }
-
-        // Get future account if available
-        {
-            let future_guard = self.future_account.lock().await;
-            if let Some(ref future_acc) = *future_guard {
-                accounts.push(future_acc.account.clone());
-            }
-        }
-
-        // If no stored accounts, create default ones as fallback
-        if accounts.is_empty() {
-            log::warn!("⚠️ No stored accounts found, creating default accounts");
-
-            accounts.push(Account::new(
-                "9A95".to_string(),
-                "DEFAULT_STOCK".to_string(),
-                AccountType::Stock,
-                "SystemUser".to_string(),
-                true,
-            ));
-
-            accounts.push(Account::new(
-                "9A95".to_string(),
-                "DEFAULT_FUTURE".to_string(),
-                AccountType::Future,
-                "SystemUser".to_string(),
-                true,
-            ));
-        }
-
-        Ok(accounts)
-    }
-
-    /// Get stored accounts from login state (sync version)
-    fn get_stored_accounts_sync(&self) -> Result<Vec<Account>> {
-        let mut accounts = Vec::new();
-
-        // Get stock account if available (try_lock for sync access)
-        if let Ok(stock_guard) = self.stock_account.try_lock() {
-            if let Some(ref stock_acc) = *stock_guard {
-                accounts.push(stock_acc.account.clone());
-            }
-        }
-
-        // Get future account if available (try_lock for sync access)
-        if let Ok(future_guard) = self.future_account.try_lock() {
-            if let Some(ref future_acc) = *future_guard {
-                accounts.push(future_acc.account.clone());
-            }
-        }
-
-        // If no stored accounts, create default ones as fallback
-        if accounts.is_empty() {
-            log::warn!("⚠️ No stored accounts found, creating default accounts");
-
-            accounts.push(Account::new(
-                "9A95".to_string(),
-                "DEFAULT_STOCK".to_string(),
-                AccountType::Stock,
-                "SystemUser".to_string(),
-                true,
-            ));
-
-            accounts.push(Account::new(
-                "9A95".to_string(),
-                "DEFAULT_FUTURE".to_string(),
-                AccountType::Future,
-                "SystemUser".to_string(),
-                true,
-            ));
-        }
-
-        Ok(accounts)
-    }
-
     /// Logout using system shioaji API
     pub async fn logout(&self) -> Result<bool> {
         log::info!("🚪 Logging out using system shioaji...");
@@ -3306,687 +3473,269 @@ inject_libpath()
             let mut callbacks = self.tick_stk_callbacks.lock().await;
             callbacks.push(callback_arc.clone());
             log::info!(
-                "📋 Stored on_tick_stk_v1 callback in global storage (bind: {}, total: {})",
-                bind,
-                callbacks.len()
+                "📊 Registered tick STK callback #{} (bind: {})",
+                callbacks.len(),
+                bind
             );
         }
 
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_tick_stk_callback_to_instance(py, instance, bind)?;
-                log::info!(
-                    "✅ Registered on_tick_stk_v1 callback to existing instance (bind={})",
-                    bind
-                );
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_tick_stk_v1 callback for later registration when instance is available");
-            Ok(())
-        }
-    }
-
-    /// Register tick callback for futures/options (原始 on_tick_fop_v1)
-    pub async fn on_tick_fop_v1<F>(&self, callback: F, bind: bool) -> Result<()>
-    where
-        F: Fn(Exchange, crate::types::TickFOPv1) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in global storage
-        {
-            let mut callbacks = self.tick_fop_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_tick_fop_v1 callback in global storage (bind: {}, total: {})",
-                bind,
-                callbacks.len()
-            );
+        // Register to Python instance if bind is true
+        if bind {
+            log::info!("📊 Tick STK callback bind mode enabled");
+            // TODO: Implement actual Python callback registration
+            // This would typically involve creating a Python callable that bridges to our Rust callbacks
         }
 
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_tick_fop_callback_to_instance(py, instance, bind)?;
-                log::info!(
-                    "✅ Registered on_tick_fop_v1 callback to existing instance (bind={})",
-                    bind
-                );
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_tick_fop_v1 callback for later registration when instance is available");
-            Ok(())
-        }
-    }
-
-    /// Register bidask callback for stocks (原始 on_bidask_stk_v1)
-    pub async fn on_bidask_stk_v1<F>(&self, callback: F, bind: bool) -> Result<()>
-    where
-        F: Fn(Exchange, crate::types::BidAskSTKv1) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in global storage
-        {
-            let mut callbacks = self.bidask_stk_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_bidask_stk_v1 callback in global storage (bind: {}, total: {})",
-                bind,
-                callbacks.len()
-            );
-        }
-
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_bidask_stk_callback_to_instance(py, instance, bind)?;
-                log::info!(
-                    "✅ Registered on_bidask_stk_v1 callback to existing instance (bind={})",
-                    bind
-                );
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_bidask_stk_v1 callback for later registration when instance is available");
-            Ok(())
-        }
-    }
-
-    /// Register bidask callback for futures/options (原始 on_bidask_fop_v1)
-    pub async fn on_bidask_fop_v1<F>(&self, callback: F, bind: bool) -> Result<()>
-    where
-        F: Fn(Exchange, crate::types::BidAskFOPv1) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in global storage
-        {
-            let mut callbacks = self.bidask_fop_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_bidask_fop_v1 callback in global storage (bind: {}, total: {})",
-                bind,
-                callbacks.len()
-            );
-        }
-
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_bidask_fop_callback_to_instance(py, instance, bind)?;
-                log::info!(
-                    "✅ Registered on_bidask_fop_v1 callback to existing instance (bind={})",
-                    bind
-                );
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_bidask_fop_v1 callback for later registration when instance is available");
-            Ok(())
-        }
-    }
-
-    /// Register quote callback for stocks (原始 on_quote_stk_v1)
-    pub async fn on_quote_stk_v1<F>(&self, callback: F, bind: bool) -> Result<()>
-    where
-        F: Fn(Exchange, crate::types::QuoteSTKv1) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in global storage
-        {
-            let mut callbacks = self.quote_stk_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_quote_stk_v1 callback in global storage (bind: {}, total: {})",
-                bind,
-                callbacks.len()
-            );
-        }
-
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_quote_stk_callback_to_instance(py, instance, bind)?;
-                log::info!(
-                    "✅ Registered on_quote_stk_v1 callback to existing instance (bind={})",
-                    bind
-                );
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_quote_stk_v1 callback for later registration when instance is available");
-            Ok(())
-        }
-    }
-
-    /// Register generic quote callback (原始 on_quote)
-    pub async fn on_quote<F>(&self, callback: F) -> Result<()>
-    where
-        F: Fn(String, serde_json::Value) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in global storage
-        {
-            let mut callbacks = self.quote_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_quote callback in global storage (total: {})",
-                callbacks.len()
-            );
-        }
-
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_quote_callback_to_instance(py, instance)?;
-                log::info!("✅ Registered on_quote callback to existing instance");
-                Ok(())
-            })
-        } else {
-            log::info!(
-                "📋 Stored on_quote callback for later registration when instance is available"
-            );
-            Ok(())
-        }
-    }
-
-    /// Register event callback (原始 on_event)
-    pub async fn on_event<F>(&self, callback: F) -> Result<()>
-    where
-        F: Fn(i32, i32, String, String) + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
-
-        // Store callback in both global storage and legacy event handlers
-        {
-            let mut callbacks = self.event_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_event callback in global storage (total: {})",
-                callbacks.len()
-            );
-        }
-
-        // Also store in legacy event handlers for compatibility
-        {
-            let mut handlers = self._event_handlers.lock().await;
-            handlers.register_event_closure(callback_arc.clone());
-        }
-
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
-
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_event_callback_to_instance(py, instance, callback_arc)?;
-                log::info!("✅ Registered on_event callback to existing instance");
-                Ok(())
-            })
-        } else {
-            log::info!(
-                "📋 Stored on_event callback for later registration when instance is available"
-            );
-            Ok(())
-        }
-    }
-
-    /// Helper method to register event callback to a specific instance
-    fn register_event_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        callback_arc: Arc<dyn Fn(i32, i32, String, String) + Send + Sync + 'static>,
-    ) -> Result<()> {
-        log::warn!("⚠️ Event callback registration attempted but not implemented");
-        log::warn!("   Real Shioaji API does not provide set_event_callback method");
-        log::warn!("   This callback will be stored but not triggered by Shioaji events");
-
-        // Store the callback reference for potential future use
-        let _rust_callback = callback_arc.clone();
-        let _instance_ref = instance;
-        let _py_ref = py;
-
-        // TODO: Implement proper Shioaji event handling
-        // Possible approaches:
-        // 1. Use Shioaji's built-in event system (if available)
-        // 2. Implement polling mechanism for status changes
-        // 3. Use WebSocket or other real-time connection for events
-
-        log::info!("📋 Event callback stored for future implementation");
+        log::info!("✅ Tick STK callback registration completed");
         Ok(())
     }
 
-    /// Register session down callback (原始 on_session_down)
-    pub async fn on_session_down<F>(&self, callback: F) -> Result<()>
-    where
-        F: Fn() + Send + Sync + 'static,
-    {
-        let callback_arc = Arc::new(callback);
+    /// Convert Trade to Python object
+    fn convert_trade_to_python(&self, py: Python, trade: &Trade) -> Result<PyObject> {
+        // Create a Python Trade object equivalent
+        // For now, create a dictionary with essential fields
+        let trade_dict = pyo3::types::PyDict::new(py);
+        
+        // Set essential trade fields
+        trade_dict.set_item("order_id", &trade.order_id)?;
+        trade_dict.set_item("seqno", &trade.seqno)?;
+        trade_dict.set_item("ordno", &trade.ordno)?;
+        trade_dict.set_item("status", trade.status.to_string())?;
+        
+        // Convert order to Python equivalent
+        let order_dict = pyo3::types::PyDict::new(py);
+        order_dict.set_item("action", trade.order.action.to_string())?;
+        order_dict.set_item("price", trade.order.price)?;
+        order_dict.set_item("quantity", trade.order.quantity)?;
+        order_dict.set_item("order_type", trade.order.order_type.to_string())?;
+        order_dict.set_item("price_type", trade.order.price_type.to_string())?;
+        
+        trade_dict.set_item("order", order_dict)?;
+        
+        Ok(trade_dict.to_object(py))
+    }
 
-        // Store callback in both global storage and legacy event handlers
-        {
-            let mut callbacks = self.session_down_callbacks.lock().await;
-            callbacks.push(callback_arc.clone());
-            log::info!(
-                "📋 Stored on_session_down callback in global storage (total: {})",
-                callbacks.len()
-            );
+    /// Convert Python Trade result to Rust Trade
+    fn convert_python_trade_result(&self, py: Python, trade_result: &PyObject) -> Result<Trade> {
+        // Extract fields from Python trade object
+        let order_id = trade_result.getattr(py, "order_id")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let seqno = trade_result.getattr(py, "seqno")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let ordno = trade_result.getattr(py, "ordno")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let status_str = trade_result.getattr(py, "status")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let status = crate::types::Status::from_string(&status_str);
+        
+        // Extract order information
+        let py_order = trade_result.getattr(py, "order")?;
+        let action_str = py_order.getattr(py, "action")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        let action = crate::types::Action::from_string(&action_str);
+        
+        let price = py_order.getattr(py, "price")?
+            .extract::<f64>(py)
+            .unwrap_or(0.0);
+        
+        let quantity = py_order.getattr(py, "quantity")?
+            .extract::<i32>(py)
+            .unwrap_or(0);
+        
+        let order = crate::types::Order {
+            action,
+            price,
+            quantity,
+            order_type: crate::types::OrderType::ROD, // Default
+            price_type: crate::types::StockPriceType::LMT, // Default
+            order_lot: Some(crate::types::StockOrderLot::Common),
+            order_cond: Some(crate::types::StockOrderCond::Cash),
+            first_sell: Some(false),
+            account: None,
+            ca: Some(String::new()),
+            seqno: Some(seqno.clone()),
+        };
+        
+        // Create default account (will be populated if available)
+        let account = crate::types::Account {
+            account_type: crate::types::AccountType::Stock,
+            person_id: Some(String::new()),
+            broker_id: String::new(),
+            account_id: String::new(),
+            signed: false,
+            username: String::new(),
+        };
+        
+        Ok(Trade {
+            order,
+            status,
+            order_id,
+            seqno,
+            ordno,
+            account,
+            contracts: vec![], // Will be populated if available
+        })
+    }
+
+    /// Convert Python trades list to Rust Vec<Trade>
+    fn convert_python_trades_list(&self, py: Python, trades_result: &PyObject) -> Result<Vec<Trade>> {
+        let mut trades = Vec::new();
+        
+        // Check if it's a list/sequence
+        if let Ok(py_list) = trades_result.extract::<Vec<PyObject>>(py) {
+            for py_trade in py_list {
+                if let Ok(trade) = self.convert_python_trade_result(py, &py_trade) {
+                    trades.push(trade);
+                }
+            }
         }
+        
+        Ok(trades)
+    }
 
-        // Also store in legacy event handlers for compatibility
-        {
-            let mut handlers = self._event_handlers.lock().await;
-            handlers.register_session_down_closure(callback_arc.clone());
+    /// Convert Python accounts list to Rust Vec<Account>
+    fn convert_python_accounts_list(&self, py: Python, accounts_result: &PyObject) -> Result<Vec<Account>> {
+        let mut accounts = Vec::new();
+        
+        // Check if it's a list/sequence
+        if let Ok(py_list) = accounts_result.extract::<Vec<PyObject>>(py) {
+            for py_account in py_list {
+                if let Ok(account) = self.convert_python_account(py, &py_account) {
+                    accounts.push(account);
+                }
+            }
         }
+        
+        Ok(accounts)
+    }
 
-        // If instance already exists, register immediately
-        let instance_guard = self
-            .instance
-            .try_lock()
-            .map_err(|_| Error::Connection("Instance lock failed".to_string()))?;
+    /// Convert Python account to Rust Account
+    fn convert_python_account(&self, py: Python, py_account: &PyObject) -> Result<Account> {
+        let account_type_str = py_account.getattr(py, "account_type")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let account_type = crate::types::AccountType::from_string(&account_type_str);
+        
+        let person_id = py_account.getattr(py, "person_id")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let broker_id = py_account.getattr(py, "broker_id")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let account_id = py_account.getattr(py, "account_id")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let signed = py_account.getattr(py, "signed")?
+            .extract::<bool>(py)
+            .unwrap_or(false);
+        
+        let username = py_account.getattr(py, "username")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        Ok(Account {
+            account_type,
+            person_id: Some(person_id),
+            broker_id,
+            account_id,
+            signed,
+            username,
+        })
+    }
 
-        if let Some(instance) = instance_guard.as_ref() {
-            Python::with_gil(|py| -> Result<()> {
-                self.register_session_down_callback_to_instance(py, instance, callback_arc)?;
-                log::info!("✅ Registered on_session_down callback to existing instance");
-                Ok(())
-            })
-        } else {
-            log::info!("📋 Stored on_session_down callback for later registration when instance is available");
-            Ok(())
+    /// Convert Account to Python object
+    fn convert_account_to_python(&self, py: Python, account: &Account) -> Result<PyObject> {
+        let account_dict = pyo3::types::PyDict::new(py);
+        
+        account_dict.set_item("account_type", account.account_type.to_string())?;
+        account_dict.set_item("person_id", account.person_id.as_ref().unwrap_or(&String::new()))?;
+        account_dict.set_item("broker_id", &account.broker_id)?;
+        account_dict.set_item("account_id", &account.account_id)?;
+        account_dict.set_item("signed", account.signed)?;
+        account_dict.set_item("username", &account.username)?;
+        
+        Ok(account_dict.to_object(py))
+    }
+
+    /// Convert Unit to Python object
+    fn convert_unit_to_python(&self, py: Python, unit: &Unit) -> Result<PyObject> {
+        Ok(unit.to_string().to_object(py))
+    }
+
+    /// Convert Python positions list to Rust Vec<Position>
+    fn convert_python_positions_list(&self, py: Python, positions_result: &PyObject) -> Result<Vec<Position>> {
+        let mut positions = Vec::new();
+        
+        // Check if it's a list/sequence
+        if let Ok(py_list) = positions_result.extract::<Vec<PyObject>>(py) {
+            for py_position in py_list {
+                if let Ok(position) = self.convert_python_position(py, &py_position) {
+                    positions.push(position);
+                }
+            }
         }
+        
+        Ok(positions)
     }
 
-    /// Helper method to register session down callback to a specific instance
-    fn register_session_down_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        callback_arc: Arc<dyn Fn() + Send + Sync + 'static>,
-    ) -> Result<()> {
-        log::warn!("⚠️ Session down callback registration attempted but not implemented");
-        log::warn!("   Real Shioaji API does not provide set_session_down_callback method");
-        log::warn!("   This callback will be stored but not triggered by Shioaji events");
-
-        // Store the callback reference for potential future use
-        let _rust_callback = callback_arc.clone();
-        let _instance_ref = instance;
-        let _py_ref = py;
-
-        // TODO: Implement proper Shioaji session monitoring
-        // Possible approaches:
-        // 1. Monitor Shioaji connection status via polling
-        // 2. Use Shioaji's built-in connection event system (if available)
-        // 3. Monitor network connectivity or WebSocket status
-
-        log::info!("📋 Session down callback stored for future implementation");
-        Ok(())
-    }
-
-    // === Helper Methods for Data Conversion ===
-
-    /// Convert PyDict to TickSTKv1
-    #[allow(dead_code)]
-    fn convert_tick_stk_v1(&self, _dict: &pyo3::types::PyDict) -> Result<crate::types::TickSTKv1> {
-        // Implementation would extract fields from PyDict and create TickSTKv1
-        // This is a placeholder - you'd need to implement field extraction
-        Ok(crate::types::TickSTKv1::default())
-    }
-
-    /// Convert PyDict to TickFOPv1
-    #[allow(dead_code)]
-    fn convert_tick_fop_v1(&self, _dict: &pyo3::types::PyDict) -> Result<crate::types::TickFOPv1> {
-        Ok(crate::types::TickFOPv1::default())
-    }
-
-    /// Convert PyDict to BidAskSTKv1
-    #[allow(dead_code)]
-    fn convert_bidask_stk_v1(
-        &self,
-        _dict: &pyo3::types::PyDict,
-    ) -> Result<crate::types::BidAskSTKv1> {
-        Ok(crate::types::BidAskSTKv1::default())
-    }
-
-    /// Convert PyDict to BidAskFOPv1
-    #[allow(dead_code)]
-    fn convert_bidask_fop_v1(
-        &self,
-        _dict: &pyo3::types::PyDict,
-    ) -> Result<crate::types::BidAskFOPv1> {
-        Ok(crate::types::BidAskFOPv1::default())
-    }
-
-    /// Convert PyDict to QuoteSTKv1
-    #[allow(dead_code)]
-    fn convert_quote_stk_v1(
-        &self,
-        _dict: &pyo3::types::PyDict,
-    ) -> Result<crate::types::QuoteSTKv1> {
-        Ok(crate::types::QuoteSTKv1::default())
-    }
-
-    // === Helper Methods for Python Bridge Registration ===
-
-    /// Register tick STK callback to Python instance
-    fn register_tick_stk_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        bind: bool,
-    ) -> Result<()> {
-        log::info!(
-            "🔗 Attempting to register tick STK callback to Python instance (bind: {})",
-            bind
-        );
-        // TODO: Implement actual Python callback registration
-        // This would typically involve:
-        // 1. Creating a Python callable that bridges to our Rust callbacks
-        // 2. Calling instance.set_on_tick_stk_v1_callback() or similar
-        let _ = (py, instance, bind); // Avoid unused warnings
-        Ok(())
-    }
-
-    /// Register tick FOP callback to Python instance
-    fn register_tick_fop_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        bind: bool,
-    ) -> Result<()> {
-        log::info!(
-            "🔗 Attempting to register tick FOP callback to Python instance (bind: {})",
-            bind
-        );
-        // TODO: Implement actual Python callback registration
-        let _ = (py, instance, bind); // Avoid unused warnings
-        Ok(())
-    }
-
-    /// Register bidask STK callback to Python instance
-    fn register_bidask_stk_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        bind: bool,
-    ) -> Result<()> {
-        log::info!(
-            "🔗 Attempting to register bidask STK callback to Python instance (bind: {})",
-            bind
-        );
-        // TODO: Implement actual Python callback registration
-        let _ = (py, instance, bind); // Avoid unused warnings
-        Ok(())
-    }
-
-    /// Register bidask FOP callback to Python instance
-    fn register_bidask_fop_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        bind: bool,
-    ) -> Result<()> {
-        log::info!(
-            "🔗 Attempting to register bidask FOP callback to Python instance (bind: {})",
-            bind
-        );
-        // TODO: Implement actual Python callback registration
-        let _ = (py, instance, bind); // Avoid unused warnings
-        Ok(())
-    }
-
-    /// Register quote STK callback to Python instance
-    fn register_quote_stk_callback_to_instance(
-        &self,
-        py: Python,
-        instance: &PyObject,
-        bind: bool,
-    ) -> Result<()> {
-        log::info!(
-            "🔗 Attempting to register quote STK callback to Python instance (bind: {})",
-            bind
-        );
-        // TODO: Implement actual Python callback registration
-        let _ = (py, instance, bind); // Avoid unused warnings
-        Ok(())
-    }
-
-    /// Register generic quote callback to Python instance
-    fn register_quote_callback_to_instance(&self, py: Python, instance: &PyObject) -> Result<()> {
-        log::info!("🔗 Attempting to register generic quote callback to Python instance");
-        // TODO: Implement actual Python callback registration
-        let _ = (py, instance); // Avoid unused warnings
-        Ok(())
-    }
-
-    // === Public Methods for Python Bridge Layer to Call ===
-
-    /// Trigger tick STK callbacks from Python bridge layer
-    pub async fn trigger_tick_stk_callbacks(
-        &self,
-        exchange: Exchange,
-        data: crate::types::TickSTKv1,
-    ) -> Result<()> {
-        let callbacks = self.tick_stk_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} tick STK callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            // Execute callback in a separate task to avoid blocking
-            let callback_clone = callback.clone();
-            let exchange_clone = exchange;
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(exchange_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All tick STK callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger tick FOP callbacks from Python bridge layer
-    pub async fn trigger_tick_fop_callbacks(
-        &self,
-        exchange: Exchange,
-        data: crate::types::TickFOPv1,
-    ) -> Result<()> {
-        let callbacks = self.tick_fop_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} tick FOP callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let exchange_clone = exchange;
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(exchange_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All tick FOP callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger bidask STK callbacks from Python bridge layer
-    pub async fn trigger_bidask_stk_callbacks(
-        &self,
-        exchange: Exchange,
-        data: crate::types::BidAskSTKv1,
-    ) -> Result<()> {
-        let callbacks = self.bidask_stk_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} bidask STK callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let exchange_clone = exchange;
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(exchange_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All bidask STK callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger bidask FOP callbacks from Python bridge layer
-    pub async fn trigger_bidask_fop_callbacks(
-        &self,
-        exchange: Exchange,
-        data: crate::types::BidAskFOPv1,
-    ) -> Result<()> {
-        let callbacks = self.bidask_fop_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} bidask FOP callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let exchange_clone = exchange;
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(exchange_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All bidask FOP callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger quote STK callbacks from Python bridge layer
-    pub async fn trigger_quote_stk_callbacks(
-        &self,
-        exchange: Exchange,
-        data: crate::types::QuoteSTKv1,
-    ) -> Result<()> {
-        let callbacks = self.quote_stk_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} quote STK callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let exchange_clone = exchange;
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(exchange_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All quote STK callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger generic quote callbacks from Python bridge layer
-    pub async fn trigger_quote_callbacks(
-        &self,
-        topic: String,
-        data: serde_json::Value,
-    ) -> Result<()> {
-        let callbacks = self.quote_callbacks.lock().await;
-        log::debug!(
-            "🚀 Triggering {} generic quote callbacks for topic: {}",
-            callbacks.len(),
-            topic
-        );
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let topic_clone = topic.clone();
-            let data_clone = data.clone();
-
-            tokio::spawn(async move {
-                callback_clone(topic_clone, data_clone);
-            });
-        }
-
-        log::debug!("✅ All generic quote callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger event callbacks from Python bridge layer
-    pub async fn trigger_event_callbacks(
-        &self,
-        resp_code: i32,
-        event_code: i32,
-        info: String,
-        event: String,
-    ) -> Result<()> {
-        let callbacks = self.event_callbacks.lock().await;
-        log::debug!(
-            "🚀 Triggering {} event callbacks (resp_code: {}, event_code: {})",
-            callbacks.len(),
-            resp_code,
-            event_code
-        );
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-            let info_clone = info.clone();
-            let event_clone = event.clone();
-
-            tokio::spawn(async move {
-                callback_clone(resp_code, event_code, info_clone, event_clone);
-            });
-        }
-
-        log::debug!("✅ All event callbacks triggered");
-        Ok(())
-    }
-
-    /// Trigger session down callbacks from Python bridge layer
-    pub async fn trigger_session_down_callbacks(&self) -> Result<()> {
-        let callbacks = self.session_down_callbacks.lock().await;
-        log::debug!("🚀 Triggering {} session down callbacks", callbacks.len());
-
-        for callback in callbacks.iter() {
-            let callback_clone = callback.clone();
-
-            tokio::spawn(async move {
-                callback_clone();
-            });
-        }
-
-        log::debug!("✅ All session down callbacks triggered");
-        Ok(())
+    /// Convert Python position to Rust Position
+    fn convert_python_position(&self, py: Python, py_position: &PyObject) -> Result<Position> {
+        // Extract basic position fields
+        let code = py_position.getattr(py, "code")?
+            .extract::<String>(py)
+            .unwrap_or_default();
+        
+        let quantity = py_position.getattr(py, "quantity")?
+            .extract::<i64>(py)
+            .unwrap_or(0);
+        
+        let price = py_position.getattr(py, "price")?
+            .extract::<f64>(py)
+            .unwrap_or(0.0);
+        
+        let last_price = py_position.getattr(py, "last_price")?
+            .extract::<f64>(py)
+            .unwrap_or(0.0);
+        
+        let pnl = py_position.getattr(py, "pnl")?
+            .extract::<f64>(py)
+            .unwrap_or(0.0);
+        
+        let yd_quantity = py_position.getattr(py, "yd_quantity")?
+            .extract::<i64>(py)
+            .unwrap_or(0);
+        
+        // Create default account
+        let account = crate::types::Account {
+            account_type: crate::types::AccountType::Stock,
+            person_id: Some(String::new()),
+            broker_id: String::new(),
+            account_id: String::new(),
+            signed: false,
+            username: String::new(),
+        };
+        
+        Ok(Position {
+            account,
+            code,
+            quantity,
+            price,
+            last_price,
+            pnl,
+            yd_quantity,
+        })
     }
 }

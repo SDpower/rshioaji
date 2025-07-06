@@ -13,7 +13,7 @@ SHIOAJI_SECRET_KEY=your_actual_secret_key_here
 SHIOAJI_SIMULATION=true
 ```
 
-### PyO3 橋接需求 (v0.4.8+)
+### PyO3 橋接需求 (v0.4.9+)
 ```bash
 # Python 版本 (建議 3.13+)
 PYTHON_VERSION=3.13

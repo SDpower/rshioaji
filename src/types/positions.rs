@@ -1,16 +1,17 @@
 use crate::types::constants::*;
 use crate::types::contracts::Contract;
+use crate::types::accounts::Account;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Position {
-    pub contract: Contract,
-    pub quantity: i32,
-    pub average_price: f64,
-    pub current_price: f64,
-    pub unrealized_pnl: f64,
-    pub realized_pnl: f64,
-    pub market_value: f64,
+    pub account: Account,
+    pub code: String,
+    pub quantity: i64,
+    pub price: f64,
+    pub last_price: f64,
+    pub pnl: f64,
+    pub yd_quantity: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
